@@ -1,0 +1,43 @@
+# FastAPI
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# LangChain
+langchain==0.3.14
+langchain-community==0.3.14
+langchain-groq==0.2.4
+
+# Embeddings
+sentence-transformers==3.3.1
+huggingface-hub==0.27.1
+
+# Vector DB
+qdrant-client==1.12.1
+
+# Document Processing
+docling==2.14.0
+python-docx==1.1.2
+
+# Semantic Router
+semantic-router==0.1.1
+
+# Evaluation
+ragas==0.2.8
+datasets==3.2.0
+
+# Utilities
+python-dotenv==1.0.1
+pydantic==2.10.4
+pydantic-settings==2.7.1
+httpx==0.28.1
+pandas==2.2.3
+
+# Auth & Database & Checkpointer
+sqlalchemy>=2.0.0
+alembic
+psycopg[binary]
+langgraph-checkpoint-postgres
+langgraph
