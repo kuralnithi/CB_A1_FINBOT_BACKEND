@@ -17,7 +17,8 @@ ENV PATH="/root/.local/bin:$PATH"
 # Install Python dependencies using uv via a virtual environment
 COPY requirements.txt .
 RUN uv venv /opt/venv \
-    && uv pip install --python /opt/venv/bin/python --no-cache -r requirements.txt
+    && uv pip install --python /opt/venv/bin/python --no-cache -r requirements.txt \
+    && /opt/venv/bin/pip uninstall -y passlib 2>/dev/null || true
 
 # Make sure all subsequent commands use the virtual environment
 ENV PATH="/opt/venv/bin:$PATH"
