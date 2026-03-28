@@ -32,14 +32,18 @@ def get_embedding_model() -> SentenceTransformer:
 
 
 def get_qdrant_client() -> QdrantClient:
-    """Create a Qdrant client."""
+    """Create a Qdrant client (works for both local and cloud)."""
     settings = get_settings()
+    if settings.qdrant_is_cloud:
+        return QdrantClient(url=settings.QDRANT_HOST, api_key=settings.QDRANT_API_KEY or None)
     return QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
 
 
 def get_async_qdrant_client() -> AsyncQdrantClient:
-    """Create an asynchronous Qdrant client."""
+    """Create an asynchronous Qdrant client (works for both local and cloud)."""
     settings = get_settings()
+    if settings.qdrant_is_cloud:
+        return AsyncQdrantClient(url=settings.QDRANT_HOST, api_key=settings.QDRANT_API_KEY or None)
     return AsyncQdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
 
 

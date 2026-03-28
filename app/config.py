@@ -17,8 +17,15 @@ class Settings(BaseSettings):
     # Qdrant
     QDRANT_HOST: str = "localhost"
     QDRANT_PORT: int = 6333
+    QDRANT_API_KEY: str = ""
     QDRANT_COLLECTION_NAME: str = "finbot_docs"
     QDRANT_COLLECTION_NAME_ROUTES: str = "finbot_routes"
+
+    @property
+    def qdrant_is_cloud(self) -> bool:
+        """True if QDRANT_HOST looks like a cloud URL (contains http:// or https://)."""
+        return self.QDRANT_HOST.startswith("http://") or self.QDRANT_HOST.startswith("https://")
+
     # JWT
     JWT_SECRET_KEY: str = "your-super-secret-jwt-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"

@@ -64,12 +64,21 @@ def get_route_layer() -> SemanticRouter:
         encoder = HuggingFaceEncoder(name="BAAI/bge-small-en-v1.5")
         # Connect the Router's index to your Qdrant instance
         # NOTE: Use a different collection name than your documents!
-        index = QdrantIndex(
-            host=settings.QDRANT_HOST,
-            port=settings.QDRANT_PORT,
-            location=None, # This is the critical missing piece
-            collection_name=settings.QDRANT_COLLECTION_NAME_ROUTES
-        )
+        if settings.qdrant_is_cloud:
+            index = QdrantIndex(
+                url=settings.QDRANT_HOST,
+                api_key=settings.QDRANT_API_KEY or None,
+                location=None,
+                collection_name=settings.QDRANT_COLLECTION_NAME_ROUTES
+            )
+        else:
+            index = QdrantIndex(
+                host=settings.QDRANT_HOST,
+                port=settings.QDRANT_PORT,
+                location=None,
+                collection_name=settings.QDRANT_COLLECTION_NAME_ROUTES
+            )
+
         _route_layer = SemanticRouter(
             encoder=encoder,
             routes=ALL_ROUTES,
