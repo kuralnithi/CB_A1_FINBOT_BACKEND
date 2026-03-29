@@ -12,7 +12,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 
-from semantic_router import Route, RouteLayer
+from semantic_router import Route, SemanticRouter
 
 from app.models import ChatResponse, User, GuardrailWarning
 from app.config import get_settings
@@ -67,7 +67,7 @@ def get_route_layer():
             ]
         )
         
-        _route_layer = RouteLayer(encoder=encoder, routes=[off_topic_route, harmful_route])
+        _route_layer = SemanticRouter(encoder=encoder, routes=[off_topic_route, harmful_route])
         logger.info("Semantic Router Layer ready.")
         
     return _route_layer
