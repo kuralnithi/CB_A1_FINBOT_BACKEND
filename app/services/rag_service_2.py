@@ -9,7 +9,7 @@ from typing import Any, AsyncGenerator
 
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain.core.tools import tool
+from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 
 from semantic_router import Route, RouteLayer
