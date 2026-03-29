@@ -2,7 +2,11 @@
 Admin API endpoints — document management and system administration.
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+import shutil
+import asyncio
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import JSONResponse
 
 from app.models import User, IngestResponse, DocumentInfo
 from app.api.deps import get_current_user
@@ -39,6 +43,7 @@ async def trigger_ingestion(
     logger.info(f"Ingestion triggered by admin: {user.username}")
 
     try:
+
         result = run_ingestion()
         return result
     except Exception as e:
@@ -300,3 +305,56 @@ async def delete_user(
     
     logger.info(f"Admin '{admin.username}' deleted user '{username}'")
     return {"status": "success", "message": f"User '{username}' has been deleted."}
+
+
+@router.post("/upload", response_class=JSONResponse)
+async def upload_document(
+    file: UploadFile = File(...),
+    collection: str = Form(...),
+    user: User = Depends(get_current_user)
+):
+    """
+    Upload a document and trigger ingestion.
+    Admin only.
+    """
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    settings = get_settings()
+    
+    # Map collection to subfolder
+    subfolders = ["general", "finance", "engineering", "marketing", "hr"]
+    if collection not in subfolders:
+        raise HTTPException(status_code=400, detail=f"Invalid collection. Must be one of: {subfolders}")
+
+    # Ensure target directory exists
+    target_dir = Path(settings.DATA_DIR) / collection
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path = target_dir / file.filename
+    
+    logger.info(f"Uploading file: {file.filename} to {collection}")
+
+    try:
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        logger.error(f"Failed to save file: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+
+    # Trigger ingestion
+    try:
+        # We run the full ingestion for simplicity, 
+        # but in a production app we might just process the new file.
+        result = run_ingestion()
+        return {
+            "status": "success", 
+            "message": f"File '{file.filename}' uploaded and indexed successfully.",
+            "ingestion_result": result
+        }
+    except Exception as e:
+        logger.error(f"Ingestion failed after upload: {e}")
+        return {
+            "status": "partial_success",
+            "message": f"File '{file.filename}' uploaded, but indexing failed: {str(e)}"
+        }

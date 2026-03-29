@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 480
 
     # Data
-    DATA_DIR: str = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
+    DATA_DIR: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 
     # Rate Limiting
     MAX_QUERIES_PER_SESSION: int = 20
