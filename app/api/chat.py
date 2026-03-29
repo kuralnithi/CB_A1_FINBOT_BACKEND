@@ -1,13 +1,13 @@
-"""
-Chat API endpoints — RAG query pipeline.
-"""
 import logging
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ChatRequest, ChatResponse, User
 from app.api.deps import get_current_user
 from app.services.rag_service import process_query
+from app.db.session import get_db
+from app.db.models import QueryLog
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/chat", tags=["Chat"])
 async def chat(
     request: ChatRequest,
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Process a chat query through the full RAG pipeline.
@@ -35,6 +36,18 @@ async def chat(
             user=user,
             session_id=request.session_id,
         )
+        
+        # Log to PostgreSQL
+        query_log = QueryLog(
+            username=user.username,
+            query=request.query,
+            answer=response.answer,
+            user_role=user.role,
+            routing_selected=response.route_selected
+        )
+        db.add(query_log)
+        await db.commit()
+
         return response
     except Exception as e:
         logger.error(f"Chat endpoint failed [{type(e).__name__}]: {e}", exc_info=True)
