@@ -25,7 +25,11 @@ ENV PATH="/root/.local/bin:$PATH"
 # 1. Install Python dependencies (Cachable layer)
 COPY requirements.txt .
 RUN uv venv /opt/venv \
-    && uv pip install --python /opt/venv/bin/python --no-cache -r requirements.txt \
+    && uv pip install --python /opt/venv/bin/python \
+        --no-cache \
+        --index-strategy unsafe-best-match \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+        -r requirements.txt \
     && /opt/venv/bin/pip uninstall -y passlib 2>/dev/null || true
 
 ENV PATH="/opt/venv/bin:$PATH"
