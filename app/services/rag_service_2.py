@@ -1,16 +1,16 @@
 """
-Experimental agent-based RAG service using semantic routing and LangChain agents.
+Production-grade agent-based RAG service using LangGraph and semantic routing.
 """
 import logging
 import time
 import json
+import re
 from typing import Any, AsyncGenerator
 
-from langchain.agents import create_agent
-from langchain.agents.middleware import AgentMiddleware, PIIMiddleware, hook_config
-from langchain.core.tools import tool
 from langchain_groq import ChatGroq
-import langgraph
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain.core.tools import tool
+from langgraph.prebuilt import create_react_agent
 
 from semantic_router import Route, RouteLayer
 
@@ -23,6 +23,18 @@ from app.guardrails.input_guards import run_input_guardrails
 from app.guardrails.output_guards import run_output_guardrails
 
 logger = logging.getLogger(__name__)
+
+# ─── PII Masker (Production Alternative to Middleware) ─────────────────────
+
+def mask_pii(text: str) -> str:
+    """Mask common PII patterns like emails and credit cards."""
+    # Simple email regex
+    email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+    text = re.sub(email_pattern, "[EMAIL_MASKED]", text)
+    # Simple credit card pattern (13-16 digits)
+    card_pattern = r'\b(?:\d[ -]*?){13,16}\b'
+    text = re.sub(card_pattern, "[CARD_MASKED]", text)
+    return text
 
 # ─── Lazy Semantic Router ──────────────────────────────────────────────────
 
@@ -60,87 +72,6 @@ def get_route_layer():
         
     return _route_layer
 
-# ─── Middleware Guardrail ──────────────────────────────────────────────────
-
-class SimpleSemanticRouterGuardrail(AgentMiddleware):
-    def __init__(self, session_id: str, user_role: str, context_texts_used: list, response: Any):
-        super().__init__()
-        self.session_id = session_id
-        self.user_role = user_role
-        self.context_texts_used = context_texts_used
-        self.response = response
-    
-    @hook_config(can_jump_to=["end"])
-    def before_agent(self, state: dict):
-        query = state.get("input", "")
-        
-        # 1. Run Input Guardrails
-        input_warnings = run_input_guardrails(query, self.session_id)
-        if input_warnings:
-            self.response.guardrail_warnings.extend(input_warnings)
-            error_warnings = [w for w in input_warnings if w.severity == "error"]
-            if error_warnings:
-                self.response.blocked = True
-                self.response.blocked_reason = error_warnings[0].type
-                return {
-                    "__next__": "end",
-                    "output": error_warnings[0].message
-                }
-                
-        # 2. Check semantic routing
-        rl = get_route_layer()
-        route = rl(query)
-        
-        if route.name == "off_topic":
-            msg = "Your query appears to be unrelated to FinSolve's business domains. I can only help with questions about company policies, finance, engineering, or marketing."
-            logger.warning(f"[AGENT] Blocked by Semantic Router: off_topic")
-            self.response.blocked = True
-            self.response.blocked_reason = "semantic_router_guardrail"
-            self.response.guardrail_warnings.append(GuardrailWarning(
-                type="semantic_router",
-                message=msg,
-                severity="error",
-            ))
-            return {
-                "__next__": "end",
-                "output": msg
-            }
-        
-        if route.name == "harmful":
-            msg = "Your query appears to contain harmful content or a prompt injection attempt. This request has been blocked for security reasons."
-            logger.warning(f"[AGENT] Blocked by Semantic Router: harmful")
-            self.response.blocked = True
-            self.response.blocked_reason = "semantic_router_guardrail"
-            self.response.guardrail_warnings.append(GuardrailWarning(
-                type="semantic_router",
-                message=msg,
-                severity="error",
-            ))
-            return {
-                "__next__": "end",
-                "output": msg
-            }
-            
-        return state
-
-    def after_agent(self, state: dict):
-        if self.response.blocked:
-            return state
-            
-        agent_output = state.get("output", "")
-        if not agent_output:
-            return state
-            
-        output_warnings = run_output_guardrails(
-            response=agent_output,
-            context_texts=self.context_texts_used,
-            user_role=self.user_role
-        )
-        if output_warnings:
-            self.response.guardrail_warnings.extend(output_warnings)
-            
-        return state
-
 # ─── Retrieval Tool ────────────────────────────────────────────────────────
 
 async def retrieve_and_build_context(query: str, target_collections: list[str], role: str, extra_roles: list[str] | None = None) -> str:
@@ -157,125 +88,136 @@ async def retrieve_and_build_context(query: str, target_collections: list[str], 
     )
     
     if not chunks:
-        return "No relevant documents found in the database."
+        return "No relevant documents found in the database matching your authorization level."
         
     context = build_context(chunks)
     return context
 
-# ─── Main Service Endpoint ──────────────────────────────────────────────────
+# ─── Main Service Endpoint (Compatibility) ──────────────────────────────────
 
 async def process_query(query: str, user: User, session_id: str) -> ChatResponse:
     """
-    Process a user query through the experimental agent RAG pipeline (Non-streaming).
-    Used primarily for compatibility with legacy systems or batch processing.
+    Compatibility wrapper for non-streaming requests.
     """
-    # Handle reloaded dict state if necessary
     if isinstance(user, dict):
         user = User(**user)
 
-    start_time = time.perf_counter()
     accessible_collections = get_accessible_collections(user.role, user.extra_roles)
-
-    response = ChatResponse(
+    
+    # We use stream_query internally and collect the result
+    full_answer = ""
+    async for chunk in stream_query(query, user, session_id):
+        # The stream yields SSE data strings like "data: {...}\n\n"
+        if chunk.startswith("data:"):
+            data = json.loads(chunk[6:])
+            if data.get("error"):
+                return ChatResponse(
+                    answer=data["error"],
+                    blocked=data.get("blocked", False),
+                    blocked_reason=data.get("reason", "internal_error"),
+                    user_role=user.role,
+                    accessible_collections=accessible_collections
+                )
+            if data.get("token"):
+                full_answer += data["token"]
+                
+    return ChatResponse(
+        answer=full_answer,
         user_role=user.role,
         accessible_collections=accessible_collections,
-    ) 
-    
-    try:
-        settings = get_settings()
-        
-        # 0. Configuration Validation
-        if not settings.GROQ_API_KEY:
-            raise ValueError("GROQ_API_KEY is missing. Please add it to Hugging Face Secrets.")
-        
-        # 1. Initialize LLM & Agent
-        llm = ChatGroq(api_key=settings.GROQ_API_KEY, model_name=settings.LLM_MODEL_NAME, temperature=0.1, max_tokens=1500)
-        
-        context_texts_used = []
-        @tool
-        async def restricted_retrieve(search_query: str) -> str:
-            """Retrieve docs from the DB with RBAC filters."""
-            context = await retrieve_and_build_context(search_query, accessible_collections, user.role, user.extra_roles)
-            context_texts_used.append(context)
-            return context
-            
-        agent = create_agent(model=llm, tools=[restricted_retrieve], 
-                             middleware=[SimpleSemanticRouterGuardrail(session_id, user.role, context_texts_used, response),
-                                         PIIMiddleware(pii_type="email", strategy="mask", apply_to_input=True),
-                                         PIIMiddleware(pii_type="credit_card", strategy="mask", apply_to_input=True)])
-        
-        result = await agent.ainvoke({"input": query})
-        response.answer = result.get("output", "Error: No output generated.")
-        response.route_selected = "agent_routed"
-        
-        return response
-        
-    except Exception as e:
-        err_msg = str(e)
-        logger.error(f"[AGENT] Critical failure: {err_msg}", exc_info=True)
-        response.answer = f"Internal System Error: {err_msg[:200]}..."
-        response.blocked = True
-        response.blocked_reason = "internal_error"
-        return response
+        route_selected="agent_routed"
+    )
 
-# ─── Production Streaming Endpoint ──────────────────────────────────────────
+# ─── Production Streaming Endpoint (LangGraph) ─────────────────────────────
 
 async def stream_query(query: str, user: User, session_id: str) -> AsyncGenerator[str, None]:
     """
-    Process a user query and yield real-time tokens and events.
-    Format: Server-Sent Events (SSE).
+    Process a user query using LangGraph ReAct agent and yield Server-Sent Events (SSE).
     """
     if isinstance(user, dict):
         user = User(**user)
 
     accessible_collections = get_accessible_collections(user.role, user.extra_roles)
-    response_metadata = ChatResponse(user_role=user.role, accessible_collections=accessible_collections) 
     
     try:
         settings = get_settings()
         
-        # 1. Initialize LLM & Agent
-        llm = ChatGroq(api_key=settings.GROQ_API_KEY, model_name=settings.LLM_MODEL_NAME, temperature=0.1, max_tokens=1500)
+        # 0. PII Masking & Validation
+        masked_query = mask_pii(query)
         
-        context_texts_used = []
-        @tool
-        async def restricted_retrieve(search_query: str) -> str:
-            """Retrieve documents relevant to the search query from the vector database."""
-            # Signal the UI that we are retrieving
-            # Note: This tool execution is inside the agent loop
-            context = await retrieve_and_build_context(search_query, accessible_collections, user.role, user.extra_roles)
-            context_texts_used.append(context)
-            return context
-            
-        agent = create_agent(model=llm, tools=[restricted_retrieve], 
-                             middleware=[SimpleSemanticRouterGuardrail(session_id, user.role, context_texts_used, response_metadata),
-                                         PIIMiddleware(pii_type="email", strategy="mask", apply_to_input=True),
-                                         PIIMiddleware(pii_type="credit_card", strategy="mask", apply_to_input=True)])
-
-        # 2. Iterate over the stream
-        # astream() yields tokens for the final output and also status updates for tools
-        async for event in agent.astream({"input": query}):
-            # Check for blocking from guardrail middleware which sets metadata
-            if response_metadata.blocked:
-                yield f"data: {json.dumps({'error': response_metadata.answer, 'blocked': True, 'reason': response_metadata.blocked_reason})}\n\n"
+        # 1. Check Guardrails (Before starting the agent/stream)
+        input_warnings = run_input_guardrails(masked_query, session_id)
+        if input_warnings:
+            error_warnings = [w for w in input_warnings if w.severity == "error"]
+            if error_warnings:
+                yield f"data: {json.dumps({'error': error_warnings[0].message, 'blocked': True, 'reason': error_warnings[0].type})}\n\n"
                 return
 
-            if "output" in event:
-                # Yield tokens as they come
-                chunk = event["output"]
-                yield f"data: {json.dumps({'token': chunk})}\n\n"
+        # 2. Check Semantic Router
+        rl = get_route_layer()
+        route = rl(masked_query)
+        
+        if route.name == "off_topic":
+            msg = "Your query appears to be unrelated to FinSolve's business domains. I can only help with questions about company policies, finance, engineering, or marketing."
+            yield f"data: {json.dumps({'error': msg, 'blocked': True, 'reason': 'semantic_router_guardrail'})}\n\n"
+            return
             
-            # Step-by-step transparency (Low Perceived Latency)
-            if "steps" in event:
-                for step in event["steps"]:
-                    # Notify the UI that a tool is being called
-                    tool_name = step.action.tool
-                    yield f"data: {json.dumps({'status': f'Invoking {tool_name}...'})}\n\n"
+        if route.name == "harmful":
+            msg = "Your query appears to contain harmful content or a prompt injection attempt. Blocked for security."
+            yield f"data: {json.dumps({'error': msg, 'blocked': True, 'reason': 'semantic_router_guardrail'})}\n\n"
+            return
 
-        # Final metadata event
+        # 3. Setup Agent & Model
+        model = ChatGroq(
+            api_key=settings.GROQ_API_KEY,
+            model_name=settings.LLM_MODEL_NAME,
+            temperature=0,
+            streaming=True
+        )
+
+        @tool
+        async def restricted_retrieve(search_query: str) -> str:
+            """
+            Retrieve documents relevant to the search query from the internal Company knowledge base (FinSolve).
+            Use this tool if you need information about company policies, architecture, or finance.
+            """
+            return await retrieve_and_build_context(
+                query=search_query, 
+                target_collections=accessible_collections, 
+                role=user.role,
+                extra_roles=user.extra_roles
+            )
+
+        # Create the LangGraph agent
+        agent = create_react_agent(model, tools=[restricted_retrieve])
+
+        # 4. Stream Results
+        logger.info(f"[STREAM] Processing query via LangGraph for user={user.username}")
+        
+        async for event in agent.astream_events(
+            {"messages": [HumanMessage(content=masked_query)]},
+            version="v2"
+        ):
+            kind = event.get("event")
+            
+            # Real-time Tokens
+            if kind == "on_chat_model_stream":
+                content = event["data"].get("chunk", {}).content
+                if content:
+                    yield f"data: {json.dumps({'token': content})}\n\n"
+            
+            # Tool Usage Transparency (Low Perceived Latency)
+            elif kind == "on_tool_start":
+                tool_name = event.get("name")
+                yield f"data: {json.dumps({'status': f'Searching {tool_name}...'})}\n\n"
+                
+            elif kind == "on_tool_end":
+                yield f"data: {json.dumps({'status': 'Analyzing findings...'})}\n\n"
+
+        # Final Metadata
         yield f"data: {json.dumps({'done': True, 'accessible_collections': accessible_collections})}\n\n"
         
     except Exception as e:
         err_msg = str(e)
-        logger.error(f"[STREAM] Critical failure: {err_msg}", exc_info=True)
-        yield f"data: {json.dumps({'error': f'Internal Error: {err_msg[:100]}...', 'blocked': True})}\n\n"
+        logger.error(f"[STREAM] LangGraph Critical failure: {err_msg}", exc_info=True)
+        yield f"data: {json.dumps({'error': f'System Error: {err_msg[:100]}...', 'blocked': True})}\n\n"
