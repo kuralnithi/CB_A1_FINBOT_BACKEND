@@ -10,6 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     DATA_DIR=/app/data
 
 # Install system dependencies and uv
+# Grouping into a single RUN to reduce layers
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpoppler-cpp-dev \
@@ -23,6 +24,7 @@ RUN apt-get update && apt-get install -y \
 ENV PATH="/root/.local/bin:$PATH"
 
 # 1. Install Python dependencies (Cachable layer)
+# COPY requirements.txt first to leverage layer caching
 COPY requirements.txt .
 RUN uv venv /opt/venv \
     && uv pip install --python /opt/venv/bin/python \
@@ -34,11 +36,8 @@ RUN uv venv /opt/venv \
 
 ENV PATH="/opt/venv/bin:$PATH"
 
-# 2. Bake-in Transformer models (Cachable layer)
-# Downloads BGE-small (RAG) and MiniLM (Evaluation) during build
-RUN python -c "from sentence_transformers import SentenceTransformer; \
-    SentenceTransformer('BAAI/bge-small-en-v1.5'); \
-    SentenceTransformer('all-MiniLM-L6-v2')"
+# Note: Model baking is removed to speed up build time. 
+# Models will be downloaded on-demand (Lazy Loading) on the first request.
 
 # Copy application code
 COPY . .

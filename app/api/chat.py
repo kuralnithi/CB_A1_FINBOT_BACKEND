@@ -1,11 +1,12 @@
 import logging
+import json
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ChatRequest, ChatResponse, User
 from app.api.deps import get_current_user
-from app.services.rag_service import process_query
+from app.services.rag_service_2 import process_query, stream_query
 from app.db.session import get_db
 from app.db.models import QueryLog
 
@@ -21,16 +22,9 @@ async def chat(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Process a chat query through the full RAG pipeline.
-    Production-grade endpoint with async handling and error safety.
+    Legacy non-streaming endpoint. Uses the experimental agent pipeline.
     """
-    logger.info(
-        f"Chat request: user={user.username}, role={user.role}, "
-        f"session={request.session_id}, query='{request.query[:80]}...'"
-    )
-
     try:
-        # Await the async process_query
         response = await process_query(
             query=request.query,
             user=user,
@@ -50,11 +44,26 @@ async def chat(
 
         return response
     except Exception as e:
-        logger.error(f"Chat endpoint failed [{type(e).__name__}]: {e}", exc_info=True)
-        # Return a structured response even on failure
+        logger.error(f"Chat endpoint failed: {e}", exc_info=True)
         return ChatResponse(
-            answer="I am encountering an unexpected error. Please try again or contact support.",
+            answer=f"Error: {str(e)[:100]}",
             blocked=True,
             blocked_reason="system_error",
             user_role=user.role,
         )
+
+@router.post("/stream")
+async def chat_stream(
+    request: ChatRequest,
+    user: User = Depends(get_current_user)
+):
+    """
+    Production-grade streaming endpoint (SSE).
+    Provides real-time tokens and agent status updates.
+    """
+    logger.info(f"Streaming request: user={user.username}, query='{request.query[:50]}...'")
+    
+    return StreamingResponse(
+        stream_query(request.query, user, request.session_id),
+        media_type="text/event-stream"
+    )

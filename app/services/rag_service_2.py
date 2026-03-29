@@ -3,7 +3,8 @@ Experimental agent-based RAG service using semantic routing and LangChain agents
 """
 import logging
 import time
-from typing import Any
+import json
+from typing import Any, AsyncGenerator
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware, PIIMiddleware, hook_config
@@ -165,7 +166,8 @@ async def retrieve_and_build_context(query: str, target_collections: list[str], 
 
 async def process_query(query: str, user: User, session_id: str) -> ChatResponse:
     """
-    Process a user query through the experimental agent RAG pipeline.
+    Process a user query through the experimental agent RAG pipeline (Non-streaming).
+    Used primarily for compatibility with legacy systems or batch processing.
     """
     # Handle reloaded dict state if necessary
     if isinstance(user, dict):
@@ -186,78 +188,94 @@ async def process_query(query: str, user: User, session_id: str) -> ChatResponse
         if not settings.GROQ_API_KEY:
             raise ValueError("GROQ_API_KEY is missing. Please add it to Hugging Face Secrets.")
         
-        if not settings.QDRANT_HOST or settings.QDRANT_HOST == "localhost":
-            if not settings.qdrant_is_cloud:
-                logger.warning("QDRANT_HOST is set to localhost in production. This will likely fail.")
-
-        # 1. Initialize LLM
-        llm = ChatGroq(
-            api_key=settings.GROQ_API_KEY,
-            model_name=settings.LLM_MODEL_NAME,
-            temperature=0.1,
-            max_tokens=1500,
-        )
+        # 1. Initialize LLM & Agent
+        llm = ChatGroq(api_key=settings.GROQ_API_KEY, model_name=settings.LLM_MODEL_NAME, temperature=0.1, max_tokens=1500)
         
-        # 2. Bind Tools
         context_texts_used = []
-
         @tool
         async def restricted_retrieve(search_query: str) -> str:
-            """
-            Retrieve documents relevant to the search query from the vector database.
-            Always use this tool if you need information about FinSolve policies, finance, or engineering.
-            """
-            context = await retrieve_and_build_context(
-                query=search_query, 
-                target_collections=accessible_collections, 
-                role=user.role,
-                extra_roles=user.extra_roles
-            )
+            """Retrieve docs from the DB with RBAC filters."""
+            context = await retrieve_and_build_context(search_query, accessible_collections, user.role, user.extra_roles)
             context_texts_used.append(context)
             return context
             
-        tools = [restricted_retrieve]
+        agent = create_agent(model=llm, tools=[restricted_retrieve], 
+                             middleware=[SimpleSemanticRouterGuardrail(session_id, user.role, context_texts_used, response),
+                                         PIIMiddleware(pii_type="email", strategy="mask", apply_to_input=True),
+                                         PIIMiddleware(pii_type="credit_card", strategy="mask", apply_to_input=True)])
         
-        # 3. Setup Middleware
-        guardrail = SimpleSemanticRouterGuardrail(
-            session_id=session_id,
-            user_role=user.role,
-            context_texts_used=context_texts_used,
-            response=response
-        )
-        
-        email_mask = PIIMiddleware(pii_type="email", strategy="mask", apply_to_input=True)
-        credit_card_mask = PIIMiddleware(pii_type="credit_card", strategy="mask", apply_to_input=True)
-        
-        # 4. Create Agent
-        agent = create_agent(
-            model=llm,
-            tools=tools,
-            middleware=[guardrail, email_mask, credit_card_mask]
-        )
-        
-        logger.info(f"[AGENT] Processing query for user={user.username}, role={user.role}")
-        
-        # 5. Execute Agent
         result = await agent.ainvoke({"input": query})
-        
-        # Extract output from agent result
-        agent_output = result.get("output", "Error: No output generated.")
-        
-        response.answer = agent_output
+        response.answer = result.get("output", "Error: No output generated.")
         response.route_selected = "agent_routed"
-        
-        total_time = time.perf_counter() - start_time
-        logger.info(f"[AGENT] Complete — time={total_time:.3f}s")
         
         return response
         
     except Exception as e:
         err_msg = str(e)
         logger.error(f"[AGENT] Critical failure: {err_msg}", exc_info=True)
-        
-        # Expose more diagnostic info in the answer for production debugging
         response.answer = f"Internal System Error: {err_msg[:200]}..."
         response.blocked = True
         response.blocked_reason = "internal_error"
         return response
+
+# ─── Production Streaming Endpoint ──────────────────────────────────────────
+
+async def stream_query(query: str, user: User, session_id: str) -> AsyncGenerator[str, None]:
+    """
+    Process a user query and yield real-time tokens and events.
+    Format: Server-Sent Events (SSE).
+    """
+    if isinstance(user, dict):
+        user = User(**user)
+
+    accessible_collections = get_accessible_collections(user.role, user.extra_roles)
+    response_metadata = ChatResponse(user_role=user.role, accessible_collections=accessible_collections) 
+    
+    try:
+        settings = get_settings()
+        
+        # 1. Initialize LLM & Agent
+        llm = ChatGroq(api_key=settings.GROQ_API_KEY, model_name=settings.LLM_MODEL_NAME, temperature=0.1, max_tokens=1500)
+        
+        context_texts_used = []
+        @tool
+        async def restricted_retrieve(search_query: str) -> str:
+            """Retrieve documents relevant to the search query from the vector database."""
+            # Signal the UI that we are retrieving
+            # Note: This tool execution is inside the agent loop
+            context = await retrieve_and_build_context(search_query, accessible_collections, user.role, user.extra_roles)
+            context_texts_used.append(context)
+            return context
+            
+        agent = create_agent(model=llm, tools=[restricted_retrieve], 
+                             middleware=[SimpleSemanticRouterGuardrail(session_id, user.role, context_texts_used, response_metadata),
+                                         PIIMiddleware(pii_type="email", strategy="mask", apply_to_input=True),
+                                         PIIMiddleware(pii_type="credit_card", strategy="mask", apply_to_input=True)])
+
+        # 2. Iterate over the stream
+        # astream() yields tokens for the final output and also status updates for tools
+        async for event in agent.astream({"input": query}):
+            # Check for blocking from guardrail middleware which sets metadata
+            if response_metadata.blocked:
+                yield f"data: {json.dumps({'error': response_metadata.answer, 'blocked': True, 'reason': response_metadata.blocked_reason})}\n\n"
+                return
+
+            if "output" in event:
+                # Yield tokens as they come
+                chunk = event["output"]
+                yield f"data: {json.dumps({'token': chunk})}\n\n"
+            
+            # Step-by-step transparency (Low Perceived Latency)
+            if "steps" in event:
+                for step in event["steps"]:
+                    # Notify the UI that a tool is being called
+                    tool_name = step.action.tool
+                    yield f"data: {json.dumps({'status': f'Invoking {tool_name}...'})}\n\n"
+
+        # Final metadata event
+        yield f"data: {json.dumps({'done': True, 'accessible_collections': accessible_collections})}\n\n"
+        
+    except Exception as e:
+        err_msg = str(e)
+        logger.error(f"[STREAM] Critical failure: {err_msg}", exc_info=True)
+        yield f"data: {json.dumps({'error': f'Internal Error: {err_msg[:100]}...', 'blocked': True})}\n\n"
