@@ -1,5 +1,6 @@
 """Application configuration loaded from environment variables."""
 import os
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 480
 
     # Data
-    DATA_DIR: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+    DATA_DIR: str = str(Path(__file__).resolve().parents[1] / "data")
 
     # Rate Limiting
     MAX_QUERIES_PER_SESSION: int = 20
