@@ -36,6 +36,6 @@ RUN mkdir -p data/general data/finance data/engineering data/marketing data/hr \
     && mkdir -p /app/model_cache \
     && chmod +x start.sh
 
-EXPOSE 7860
+EXPOSE 8000
 
 CMD ["./start.sh"]

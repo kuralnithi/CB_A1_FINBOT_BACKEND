@@ -7,6 +7,6 @@ alembic upgrade head
 echo "Running initial system setup..."
 python do_setup.py
 
-# 3. Start the FastAPI application
-echo "Starting FastAPI on port 7860..."
-uvicorn main:app --host 0.0.0.0 --port 7860
+# 3. Start the FastAPI application on dynamic port for Railway/HF
+echo "Starting FastAPI on port ${PORT:-8000}..."
+uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
