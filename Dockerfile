@@ -9,15 +9,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
     DATA_DIR=/app/data \
     PATH="/opt/venv/bin:/root/.local/bin:$PATH"
 
-# Install uv first (cached)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install minimal system deps
+# 1. Install system dependencies
 RUN apt-get update && apt-get install -y \
     libpoppler-cpp-dev \
     pkg-config \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+# 2. Add uv from its official image (cleaner than curl)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 # Install Python deps
 COPY requirements.txt .
