@@ -48,17 +48,7 @@ def run_ingestion(data_dir: str | None = None) -> IngestResponse:
 
     logger.info(f"Found {len(files_info)} documents to process")
 
-    # Clear existing collection for re-indexing
-    try:
-        client = get_qdrant_client()
-        collection_name = settings.QDRANT_COLLECTION_NAME
-        collections = [c.name for c in client.get_collections().collections]
-        if collection_name in collections:
-            client.delete_collection(collection_name)
-            logger.info(f"Deleted existing collection: {collection_name}")
-    except Exception as e:
-        logger.warning(f"Could not clear collection: {e}")
-
+    # Note: We now clear the collection at the very end to prevent downtime.
     all_chunks = []
     documents_processed = 0
     temp_files = []  # Track temp files for cleanup
@@ -115,6 +105,18 @@ def run_ingestion(data_dir: str | None = None) -> IngestResponse:
 
     # Step 5: Index into Qdrant
     logger.info(f"Indexing {len(all_chunks)} chunks into Qdrant...")
+    
+    # Clear existing collection right before inserting new chunks to prevent downtime
+    try:
+        client = get_qdrant_client()
+        collection_name = settings.QDRANT_COLLECTION_NAME
+        collections = [c.name for c in client.get_collections().collections]
+        if collection_name in collections:
+            client.delete_collection(collection_name)
+            logger.info(f"Deleted existing collection: {collection_name}")
+    except Exception as e:
+        logger.warning(f"Could not clear collection before indexing: {e}")
+        
     chunks_indexed = index_chunks(all_chunks)
 
     # Cleanup temp files
