@@ -24,6 +24,7 @@ COPY requirements.txt .
 RUN uv venv /opt/venv \
     && uv pip install --python /opt/venv/bin/python \
     --no-cache \
+    --index-strategy unsafe-best-match \
     --extra-index-url https://download.pytorch.org/whl/cpu \
     -r requirements.txt
 
