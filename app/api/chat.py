@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ChatRequest, ChatResponse, User
 from app.api.deps import get_current_user
-from app.services.rag_service_2 import process_query, stream_query
+from app.services.rag_service import process_query
 from app.db.session import get_db
 from app.db.models import QueryLog
 
@@ -58,12 +58,40 @@ async def chat_stream(
     user: User = Depends(get_current_user)
 ):
     """
-    Production-grade streaming endpoint (SSE).
-    Provides real-time tokens and agent status updates.
+    Streaming compatibility endpoint using the main rag_service.
     """
     logger.info(f"Streaming request: user={user.username}, query='{request.query[:50]}...'")
     
+    async def stream_generator():
+        try:
+            # First notify that we are generating
+            yield f"data: {json.dumps({'status': 'Analyzing and retrieving documents...'})}\n\n"
+            
+            response = await process_query(request.query, user, request.session_id)
+            
+            if response.blocked:
+                yield f"data: {json.dumps({'error': response.blocked_reason, 'blocked': True, 'reason': getattr(response, 'blocked_reason', 'blocked')})}\n\n"
+            else:
+                # Provide the tokens
+                if response.answer:
+                    # In a real streaming scenario we would stream tokens. Here we send the whole response as one chunk.
+                    yield f"data: {json.dumps({'token': response.answer})}\n\n"
+                
+                # Provide sources and warnings if present
+                # To attach it to the final event so frontend can pick it up
+                done_payload = {
+                    'done': True, 
+                    'accessible_collections': response.accessible_collections,
+                    'sources': [source.dict() for source in response.sources] if getattr(response, "sources", None) else [],
+                    'guardrail_warnings': [w.dict() for w in response.guardrail_warnings] if getattr(response, "guardrail_warnings", None) else []
+                }
+                yield f"data: {json.dumps(done_payload)}\n\n"
+                
+        except Exception as e:
+            logger.error(f"Stream endpoint failed: {e}", exc_info=True)
+            yield f"data: {json.dumps({'error': f'System Error: {str(e)[:100]}...', 'blocked': True})}\n\n"
+
     return StreamingResponse(
-        stream_query(request.query, user, request.session_id),
+        stream_generator(),
         media_type="text/event-stream"
     )

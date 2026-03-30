@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     # Groq LLM
     GROQ_API_KEY: str = ""
-    LLM_MODEL_NAME: str = "llama-3.3-70b-versatile"
+    LLM_MODEL_NAME: str = "llama-3.1-8b-instant"
 
     # Embeddings
     EMBEDDING_MODEL_NAME: str = "BAAI/bge-small-en-v1.5"

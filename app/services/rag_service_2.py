@@ -67,9 +67,10 @@ def get_route_layer():
             ]
         )
         
-        _route_layer = SemanticRouter(encoder=encoder, routes=[off_topic_route, harmful_route])
+        _route_layer = SemanticRouter(encoder=encoder)
+        _route_layer.add(routes=[off_topic_route, harmful_route])
         logger.info("Semantic Router Layer ready.")
-        
+    
     return _route_layer
 
 # ─── Retrieval Tool ────────────────────────────────────────────────────────
