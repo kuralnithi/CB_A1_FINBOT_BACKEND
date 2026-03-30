@@ -34,6 +34,7 @@ COPY . .
 # Setup dirs
 RUN mkdir -p data/general data/finance data/engineering data/marketing data/hr \
     && mkdir -p /app/model_cache \
+    && sed -i 's/\r$//' start.sh \
     && chmod +x start.sh
 
 EXPOSE 7860
