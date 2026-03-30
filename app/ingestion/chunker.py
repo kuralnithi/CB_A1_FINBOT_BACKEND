@@ -7,7 +7,9 @@ with full metadata for RBAC-aware retrieval.
 import uuid
 import logging
 from pathlib import Path
-from docling.document_converter import DocumentConverter
+from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling_core.transforms.chunker import HierarchicalChunker
 
 from app.models import ChunkMetadata
@@ -36,8 +38,18 @@ def create_chunks(
     chunks = []
 
     try:
+        # Optimize Docling to use minimal memory (prevents OOM on Railway 500MB limits)
+        pipeline_options = PdfPipelineOptions(
+            do_ocr=False,
+            do_table_structure=False,
+        )
+        
         # Parse document with Docling
-        converter = DocumentConverter()
+        converter = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+            }
+        )
         result = converter.convert(filepath)
         doc = result.document
 
