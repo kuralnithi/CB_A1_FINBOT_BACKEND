@@ -55,8 +55,12 @@ async def run_setup():
     
     # 1. Database Setup
     if AsyncSessionLocal:
-        async with AsyncSessionLocal() as db:
-            await setup_admin(db)
+        try:
+            async with AsyncSessionLocal() as db:
+                # Add a local timeout for the admin setup to avoid platform startup hangs
+                await asyncio.wait_for(setup_admin(db), timeout=30.0)
+        except Exception as e:
+            logger.error(f"Admin setup failed or timed out: {e}")
     else:
         logger.warning("Database session not initialized. Skipping admin setup.")
 
