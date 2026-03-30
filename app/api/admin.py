@@ -44,8 +44,8 @@ async def trigger_ingestion(
     logger.info(f"Ingestion triggered by admin: {user.username}")
 
     try:
-
-        result = run_ingestion()
+        from fastapi.concurrency import run_in_threadpool
+        result = await run_in_threadpool(run_ingestion)
         return result
     except Exception as e:
         logger.error(f"Ingestion failed: {e}", exc_info=True)
@@ -345,9 +345,10 @@ async def upload_document(
 
     # Trigger ingestion
     try:
+        from fastapi.concurrency import run_in_threadpool
         # We run the full ingestion for simplicity, 
         # but in a production app we might just process the new file.
-        result = run_ingestion()
+        result = await run_in_threadpool(run_ingestion)
         return {
             "status": "success", 
             "message": f"File '{file.filename}' uploaded and indexed successfully.",
