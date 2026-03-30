@@ -47,10 +47,19 @@ async def trigger_ingestion(
     logger.info(f"Ingestion triggered by admin: {user.username}")
 
     try:
-        background_tasks.add_task(run_ingestion)
+        import sys
+        import subprocess
+        
+        # Run ingestion in a wholly detached process to protect FastAPI from PyTorch OOMs.
+        subprocess.Popen(
+            [sys.executable, "-c", "from app.ingestion.pipeline import run_ingestion; run_ingestion()"],
+            stdout=sys.stdout,
+            stderr=sys.stderr
+        )
+        
         return IngestResponse(
             status="success",
-            message="Ingestion started in the background. This may take a few minutes."
+            message="Ingestion started in an isolated background process. This may take a few minutes."
         )
     except Exception as e:
         logger.error(f"Ingestion failed to start: {e}", exc_info=True)
@@ -351,9 +360,16 @@ async def upload_document(
 
     # Trigger ingestion
     try:
+        import sys
+        import subprocess
+        
         # We run the full ingestion for simplicity, 
         # but in a production app we might just process the new file.
-        background_tasks.add_task(run_ingestion)
+        subprocess.Popen(
+            [sys.executable, "-c", "from app.ingestion.pipeline import run_ingestion; run_ingestion()"],
+            stdout=sys.stdout,
+            stderr=sys.stderr
+        )
         return {
             "status": "success", 
             "message": f"File '{file.filename}' uploaded successfully. Background ingestion started."
