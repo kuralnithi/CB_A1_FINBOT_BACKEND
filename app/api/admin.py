@@ -31,8 +31,11 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     return user
 
 
+from fastapi import BackgroundTasks
+
 @router.post("/ingest", response_model=IngestResponse)
 async def trigger_ingestion(
+    background_tasks: BackgroundTasks,
     user: User = Depends(require_admin),
 ):
     """
@@ -44,14 +47,16 @@ async def trigger_ingestion(
     logger.info(f"Ingestion triggered by admin: {user.username}")
 
     try:
-        from fastapi.concurrency import run_in_threadpool
-        result = await run_in_threadpool(run_ingestion)
-        return result
+        background_tasks.add_task(run_ingestion)
+        return IngestResponse(
+            status="success",
+            message="Ingestion started in the background. This may take a few minutes."
+        )
     except Exception as e:
-        logger.error(f"Ingestion failed: {e}", exc_info=True)
+        logger.error(f"Ingestion failed to start: {e}", exc_info=True)
         return IngestResponse(
             status="error",
-            message=f"Ingestion failed: {str(e)}",
+            message=f"Ingestion failed to start: {str(e)}",
         )
 
 
@@ -310,6 +315,7 @@ async def delete_user(
 
 @router.post("/upload", response_class=JSONResponse)
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     collection: str = Form(...),
     user: User = Depends(get_current_user)
@@ -345,20 +351,18 @@ async def upload_document(
 
     # Trigger ingestion
     try:
-        from fastapi.concurrency import run_in_threadpool
         # We run the full ingestion for simplicity, 
         # but in a production app we might just process the new file.
-        result = await run_in_threadpool(run_ingestion)
+        background_tasks.add_task(run_ingestion)
         return {
             "status": "success", 
-            "message": f"File '{file.filename}' uploaded and indexed successfully.",
-            "ingestion_result": result
+            "message": f"File '{file.filename}' uploaded successfully. Background ingestion started."
         }
     except Exception as e:
-        logger.error(f"Ingestion failed after upload: {e}")
+        logger.error(f"Failed to start background ingestion: {e}")
         return {
             "status": "partial_success",
-            "message": f"File '{file.filename}' uploaded, but indexing failed: {str(e)}"
+            "message": f"File '{file.filename}' uploaded, but failed to start indexing: {str(e)}"
         }
 
 from app.db.models import QueryLog
