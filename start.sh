@@ -5,7 +5,7 @@ alembic upgrade head
 
 # 2. Run initial setup (create admin, collections, etc.)
 echo "Running initial system setup..."
-python do_setup.py
+python scripts/setup.py
 
 # 3. Start the FastAPI application explicitly on 7860
 # (Railway routes to EXPOSE 7860, and Hugging Face expects 7860)
