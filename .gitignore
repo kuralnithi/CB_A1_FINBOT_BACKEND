@@ -1,4 +1,4 @@
-# Python-generated files
+# ─── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[oc]
 build/
@@ -6,10 +6,25 @@ dist/
 wheels/
 *.egg-info
 
-# Virtual environments
-.venv
+# ─── Virtual Environments ─────────────────────────────────────────────────────
+.venv/
 
-# Environment variables
+# ─── Environment Secrets ──────────────────────────────────────────────────────
 .env
 .env.test
 .env.local
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+
+# ─── Testing & Linting ───────────────────────────────────────────────────────
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# ─── Runtime Artifacts ────────────────────────────────────────────────────────
+ingestion_status.json
+*.db
+uv.lock

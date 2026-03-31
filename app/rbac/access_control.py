@@ -113,24 +113,28 @@ def build_qdrant_filter(role: str, target_collections: list[str] | None = None, 
     else:
         collections_to_search = accessible
 
-    if not collections_to_search:
-        # Return a filter that matches nothing
-        logger.warning(f"No accessible collections for role '{role}' — returning empty filter")
-        collections_to_search = ["__none__"]
+    # SUPER ADMIN BYPASS: If c_level, search everything (no filters)
+    if role == "c_level":
+        logger.info(f"Super Admin bypass: Searching all collections for {role}")
+        return None
 
-    # Build the filter: collection must be in allowed list AND access_roles must include any of the user's roles
-    qdrant_filter = Filter(
-        must=[
-            FieldCondition(
-                key="collection",
-                match=MatchAny(any=collections_to_search),
-            ),
-            FieldCondition(
-                key="access_roles",
-                match=MatchAny(any=all_roles),
-            ),
-        ]
+    # Build the filter for all other roles
+    must_conditions = [
+        FieldCondition(
+            key="collection",
+            match=MatchAny(any=collections_to_search),
+        )
+    ]
+    
+    # Check for access_roles metadata
+    must_conditions.append(
+        FieldCondition(
+            key="access_roles",
+            match=MatchAny(any=all_roles),
+        )
     )
+
+    qdrant_filter = Filter(must=must_conditions)
 
     logger.info(
         f"Built Qdrant filter: role='{role}', extra={extra_roles}, "

@@ -1,22 +1,25 @@
-"""Application configuration loaded from environment variables."""
-import os
+"""
+Application configuration loaded from environment variables.
+
+All sensitive defaults are empty strings — real values MUST come from .env.
+"""
 from pathlib import Path
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    """Application settings."""
+    """Application settings — loaded from .env at startup."""
 
-    # Groq LLM
+    # ─── LLM (Groq) ──────────────────────────────────────────────────────────
     GROQ_API_KEY: str = ""
     LLM_MODEL_NAME: str = "llama-3.1-8b-instant"
 
-    # Embeddings
+    # ─── Embeddings ───────────────────────────────────────────────────────────
     EMBEDDING_MODEL_NAME: str = "BAAI/bge-small-en-v1.5"
 
-    # Qdrant
-    QDRANT_HOST: str = "localhost"
+    # ─── Qdrant ───────────────────────────────────────────────────────────────
+    QDRANT_HOST: str = ""
     QDRANT_PORT: int = 6333
     QDRANT_API_KEY: str = ""
     QDRANT_COLLECTION_NAME: str = "finbot_docs"
@@ -24,26 +27,26 @@ class Settings(BaseSettings):
 
     @property
     def qdrant_is_cloud(self) -> bool:
-        """True if QDRANT_HOST looks like a cloud URL (contains http:// or https://)."""
+        """True if QDRANT_HOST looks like a cloud URL."""
         return self.QDRANT_HOST.startswith("http://") or self.QDRANT_HOST.startswith("https://")
 
-    # JWT
-    JWT_SECRET_KEY: str = "your-super-secret-jwt-key-change-in-production"
+    # ─── JWT ──────────────────────────────────────────────────────────────────
+    JWT_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 480
 
-    # Data
+    # ─── Data ─────────────────────────────────────────────────────────────────
     DATA_DIR: str = str(Path(__file__).resolve().parents[1] / "data")
 
-    # Rate Limiting
+    # ─── Rate Limiting ────────────────────────────────────────────────────────
     MAX_QUERIES_PER_SESSION: int = 20
 
-    # PostgreSQL Database
-    DATABASE_URL: str = "postgresql+psycopg://neondb_owner:npg_2BeX5lpuECnU@ep-aged-union-a47ak6ww-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+    # ─── PostgreSQL ───────────────────────────────────────────────────────────
+    DATABASE_URL: str = ""
 
-    # Admin Setup Defaults
+    # ─── Admin Bootstrap ──────────────────────────────────────────────────────
     ADMIN_USER: str = "finbot_admin"
-    ADMIN_PASS: str = "ChangeThisPassword123!"
+    ADMIN_PASS: str = ""
 
     class Config:
         env_file = ".env"

@@ -4,6 +4,7 @@ Vector store indexer — generates embeddings and upserts into Qdrant.
 Uses HuggingFace BGE embeddings and Qdrant for storage.
 """
 import logging
+import uuid
 from qdrant_client import QdrantClient, AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
@@ -82,7 +83,6 @@ def index_chunks(chunks: list[dict]) -> int:
     client = get_qdrant_client()
 
     # Ensure collection exists
-    # BGE-small-en-v1.5 produces 384-dim vectors
     ensure_collection_exists(client, settings.QDRANT_COLLECTION_NAME, vector_size=384)
 
     # Generate embeddings in batches
@@ -98,8 +98,9 @@ def index_chunks(chunks: list[dict]) -> int:
 
     # Build Qdrant points
     points = []
-    for idx, (chunk, embedding) in enumerate(zip(chunks, all_embeddings)):
+    for chunk, embedding in zip(chunks, all_embeddings):
         meta: ChunkMetadata = chunk["metadata"]
+        point_id = str(uuid.uuid4())
 
         payload = {
             "text": chunk["text"],
@@ -116,7 +117,7 @@ def index_chunks(chunks: list[dict]) -> int:
         }
 
         points.append(PointStruct(
-            id=idx,
+            id=point_id,
             vector=embedding,
             payload=payload,
         ))

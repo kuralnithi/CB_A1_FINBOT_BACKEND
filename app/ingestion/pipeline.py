@@ -1,16 +1,22 @@
-"""
-Ingestion pipeline orchestrator.
-
-Scans data directory → parses → chunks → summarizes → indexes.
-"""
 import os
 import logging
+import sys
+import asyncio
 from pathlib import Path
 
+# CRITICAL: For Windows compatibility with psycopg3 async mode, 
+# this MUST be set if this file is run in a separate process.
+if sys.platform == 'win32':
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
+
+from app.ingestion.status_tracker import update_status
 from app.ingestion.parser import scan_data_directory, preprocess_file
 from app.ingestion.chunker import create_chunks
 from app.ingestion.summarizer import generate_parent_summaries
-from app.ingestion.indexer import index_chunks, get_qdrant_client
+from app.ingestion.indexer import index_chunks, get_qdrant_client, ensure_collection_exists
 from app.config import get_settings
 from app.models import IngestResponse
 
@@ -37,10 +43,12 @@ def run_ingestion(data_dir: str | None = None) -> IngestResponse:
     data_dir = data_dir or settings.DATA_DIR
 
     logger.info(f"Starting ingestion from: {data_dir}")
-
+    update_status("processing", 10, f"Starting ingestion from {data_dir}...")
+    
     # Step 1: Scan data directory
     files_info = scan_data_directory(data_dir)
     if not files_info:
+        update_status("error", 0, "No documents found.")
         return IngestResponse(
             status="error",
             message=f"No documents found in {data_dir}",
@@ -82,6 +90,8 @@ def run_ingestion(data_dir: str | None = None) -> IngestResponse:
             if chunks:
                 all_chunks.extend(chunks)
                 documents_processed += 1
+                progress = 10 + int((documents_processed / len(files_info)) * 50)
+                update_status("processing", progress, f"Created {len(chunks)} chunks from {filename}")
                 logger.info(f"  → Created {len(chunks)} chunks from {filename}")
             else:
                 logger.warning(f"  → No chunks created from {filename}")
@@ -96,28 +106,32 @@ def run_ingestion(data_dir: str | None = None) -> IngestResponse:
             documents_processed=documents_processed,
         )
 
-    # Step 4: Generate parent summaries
-    logger.info("Generating parent-level summaries...")
-    try:
-        all_chunks = generate_parent_summaries(all_chunks)
-    except Exception as e:
-        logger.warning(f"Parent summarization failed (continuing without): {e}")
+    # Step 4: Generate parent summaries (temporarily bypassed to fix hangs)
+    logger.info("Skipping parent summarization for faster indexing...")
+    # try:
+    #     all_chunks = generate_parent_summaries(all_chunks)
+    # except Exception as e:
+    #     logger.warning(f"Parent summarization failed: {e}")
 
     # Step 5: Index into Qdrant
     logger.info(f"Indexing {len(all_chunks)} chunks into Qdrant...")
     
-    # Clear existing collection right before inserting new chunks to prevent downtime
+    # NEW: Ensure collection exists BEFORE we do anything
     try:
         client = get_qdrant_client()
         collection_name = settings.QDRANT_COLLECTION_NAME
-        collections = [c.name for c in client.get_collections().collections]
-        if collection_name in collections:
-            client.delete_collection(collection_name)
-            logger.info(f"Deleted existing collection: {collection_name}")
+        # This will create it if you deleted it manually
+        ensure_collection_exists(client, collection_name, vector_size=384)
+        
+        # Now clear it for a clean re-index
+        client.delete_collection(collection_name)
+        ensure_collection_exists(client, collection_name, vector_size=384)
+        logger.info(f"Refreshed collection: {collection_name}")
     except Exception as e:
-        logger.warning(f"Could not clear collection before indexing: {e}")
+        logger.warning(f"Collection reset failed: {e}")
         
     chunks_indexed = index_chunks(all_chunks)
+    update_status("completed", 100, f"Successfully indexed {chunks_indexed} chunks.")
 
     # Cleanup temp files
     for tmp in temp_files:

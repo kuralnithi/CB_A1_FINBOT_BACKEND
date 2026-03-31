@@ -1,9 +1,11 @@
-"""
-FinBot — FastAPI Application Entry Point.
+import sys
+import asyncio
 
-Production-grade Advanced RAG system with RBAC, semantic routing,
-guardrails, and RAGAS evaluation.
-"""
+# CRITICAL: For Windows compatibility with psycopg3 async mode, 
+# this MUST be set before ANY other imports or loop starts.
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -15,12 +17,8 @@ from dotenv import load_dotenv
 # Load .env before anything else
 load_dotenv()
 
-import sys
-import asyncio
-if sys.platform == 'win32':
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
-from app.api import auth, chat, admin
+from app.api import auth, chat
+from app.api.admin import router as admin_router
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -69,7 +67,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(chat.router)
-app.include_router(admin.router)
+app.include_router(admin_router)
 
 
 # ─── Health Check ─────────────────────────────────────────────────────────────

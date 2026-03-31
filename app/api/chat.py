@@ -55,7 +55,8 @@ async def chat(
 @router.post("/stream")
 async def chat_stream(
     request: ChatRequest,
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Streaming compatibility endpoint using the main rag_service.
@@ -69,12 +70,29 @@ async def chat_stream(
             
             response = await process_query(request.query, user, request.session_id)
             
+            # Log to PostgreSQL (for Analytics dashboard)
+            try:
+                query_log = QueryLog(
+                    username=user.username,
+                    query=request.query,
+                    answer=response.answer or "Access Blocked",
+                    user_role=user.role,
+                    routing_selected=response.route_selected or "unknown",
+                    is_exported=False
+                )
+                db.add(query_log)
+                await db.commit()
+            except Exception as e:
+                logger.error(f"Failed to log query to DB: {e}")
+                # We don't fail the entire stream if logging fails
+            
             if response.blocked:
                 yield f"data: {json.dumps({'error': response.blocked_reason, 'blocked': True, 'reason': getattr(response, 'blocked_reason', 'blocked')})}\n\n"
             else:
                 # Provide the tokens
                 if response.answer:
-                    # In a real streaming scenario we would stream tokens. Here we send the whole response as one chunk.
+                    # In a real streaming scenario we would stream tokens. 
+                    # Here we send the whole response as one chunk for reliability.
                     yield f"data: {json.dumps({'token': response.answer})}\n\n"
                 
                 # Provide sources and warnings if present

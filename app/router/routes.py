@@ -20,6 +20,9 @@ finance_route = Route(
         "What are our revenue growth trends?",
         "Show me cash flow analysis",
         "What is the financial summary for FY2024?",
+        "Show me vendor details and contacts",
+        "Tell me about our vendors",
+        "What are the vendor payment terms?",
     ],
 )
 
@@ -60,6 +63,9 @@ marketing_route = Route(
         "What are the latest content marketing metrics?",
         "How effective was our email campaign?",
         "What is our social media engagement rate?",
+        "Tell me about the marketing team in this company",
+        "Who is on the marketing team?",
+        "What are the marketing team's responsibilities?",
     ],
 )
 

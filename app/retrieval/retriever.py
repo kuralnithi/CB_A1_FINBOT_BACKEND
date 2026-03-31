@@ -56,6 +56,7 @@ async def retrieve_chunks(
 
     # Query Qdrant with filter asynchronously
     try:
+        logger.info(f"[RETRIEVER] Filter: {qdrant_filter}")
         results = await client.search(
             collection_name=settings.QDRANT_COLLECTION_NAME,
             query_vector=query_vector,
@@ -63,6 +64,21 @@ async def retrieve_chunks(
             limit=top_k,
             with_payload=True,
         )
+        
+        # ─── FALLBACK: Unfiltered search for c_level if no results ─────────
+        if not results and role == "c_level":
+            logger.warning("[RETRIEVER] No results with filter. Attempting unfiltered search for Admin bypass.")
+            results = await client.search(
+                collection_name=settings.QDRANT_COLLECTION_NAME,
+                query_vector=query_vector,
+                query_filter=None,
+                limit=top_k,
+                with_payload=True,
+            )
+            
+        logger.info(f"[RETRIEVER] Raw results count: {len(results)}")
+        if results:
+            logger.info(f"[RETRIEVER] Best score: {results[0].score}")
     except Exception as e:
         logger.error(f"Qdrant search failed: {e}", exc_info=True)
         return [], []

@@ -1,8 +1,16 @@
-"""Database session management."""
-from typing import AsyncGenerator
 import logging
+import sys
+import asyncio
+from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from app.config import get_settings
+
+# Windows compatibility fix for psycopg3 async mode
+if sys.platform == 'win32':
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

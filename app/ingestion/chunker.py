@@ -38,6 +38,46 @@ def create_chunks(
     chunks = []
 
     try:
+        # CASE 1: Handle CSV-converted files with a fast row-based chunker
+        # Docling hierarchical chunker struggles with very large CSV tables.
+        if original_filename.lower().endswith(".csv"):
+            logger.info(f"Using fast CSV chunker for {original_filename}")
+            with open(filepath, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            
+            # The CSV converter starts with a # Title, then a blank line, then the table.
+            # Lines 0-1 are usually title, line 2 is header, line 3 is separator (| --- |)
+            header_line = lines[2] if len(lines) > 2 else ""
+            sep_line = lines[3] if len(lines) > 3 else ""
+            data_lines = lines[4:] if len(lines) > 4 else []
+            
+            if data_lines:
+                # Group rows together (e.g., 20 rows per chunk) to preserve context
+                rows_per_chunk = 15
+                for j in range(0, len(data_lines), rows_per_chunk):
+                    batch = data_lines[j:j + rows_per_chunk]
+                    chunk_text = f"{lines[0]}\n{header_line}{sep_line}" + "".join(batch)
+                    
+                    metadata = ChunkMetadata(
+                        chunk_id=str(uuid.uuid4()),
+                        source_document=original_filename,
+                        collection=collection,
+                        access_roles=access_roles,
+                        section_title=f"Page {j // rows_per_chunk + 1}",
+                        page_number=j // rows_per_chunk + 1,
+                        chunk_type="table",
+                        parent_chunk_id=None,
+                        hierarchy_path=[original_filename],
+                        parent_summary="",
+                    )
+                    chunks.append({"text": chunk_text, "metadata": metadata})
+                
+                logger.info(f"Fast CSV chunker created {len(chunks)} chunks from {original_filename}")
+                return chunks
+
+        # CASE 2: Standard Docling hierarchical chunking for PDF/Word/Markdown
+        logger.info(f"Parsing {original_filename} with Docling...")
+
         # Optimize Docling to use minimal memory (prevents OOM on Railway 500MB limits)
         pipeline_options = PdfPipelineOptions(
             do_ocr=False,

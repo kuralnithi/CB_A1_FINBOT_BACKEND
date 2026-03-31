@@ -63,6 +63,17 @@ def run_evaluation(dataset_name: str = "finbot_eval"):
         from sentence_transformers import SentenceTransformer, util
         import torch
         
+        # ─── REAL-TIME PROGRESS TRACKING ───────────────────
+        from app.evaluation.status_tracker import update_eval_status, reset_eval_status
+        reset_eval_status()
+        
+        # Get total number of examples for progress bar
+        total_examples = sum(1 for _ in client.list_examples(dataset_id=dataset.id))
+        update_eval_status(status="running", total=total_examples, message="Initializing evaluation...")
+        
+        # Counter for progress
+        processed_count = 0
+
         # Load a small, fast model for semantic similarity
         model = SentenceTransformer('all-MiniLM-L6-v2')
         
@@ -95,6 +106,7 @@ def run_evaluation(dataset_name: str = "finbot_eval"):
         import asyncio
 
         def rag_pipeline(inputs: dict) -> dict:
+            nonlocal processed_count
             user = User(username="evaluator", role="c_level", display_name="LangSmith")
             try:
                 loop = asyncio.new_event_loop()
@@ -103,6 +115,14 @@ def run_evaluation(dataset_name: str = "finbot_eval"):
                     process_query(query=inputs["question"], user=user, session_id="langsmith_eval")
                 )
                 loop.close()
+                
+                # Update progress
+                processed_count += 1
+                update_eval_status(
+                    current=processed_count, 
+                    message=f"Testing: {inputs['question'][:30]}..."
+                )
+                
                 return {"answer": response.answer}
             except Exception as e:
                 logger.error(f"Error evaluating pipeline input: {e}")
@@ -113,7 +133,8 @@ def run_evaluation(dataset_name: str = "finbot_eval"):
             rag_pipeline,
             data=dataset_name,
             evaluators=[similarity_evaluator],
-            experiment_prefix="FinBot-Eval"
+            experiment_prefix="FinBot-Eval",
+            max_concurrency=1 # Force serial execution to keep progress bar smooth and avoid DB lock issues
         )
 
         # Compute aggregate score
