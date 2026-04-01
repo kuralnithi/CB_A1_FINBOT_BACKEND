@@ -12,6 +12,16 @@ pinned: true
 
 This is the FastAPI backend for the FinBot RAG system, designed for deployment on Hugging Face Spaces using Docker.
 
+## 🔗 Project Links
+
+| Component | Link |
+| --- | --- |
+| **🚀 Frontend (Live)** | [finbot-kuralnithi.netlify.app](https://finbot-kuralnithi.netlify.app) |
+| **⚙️ Backend (API Docs)** | [cba1finbotbackend-production.up.railway.app/docs](https://cba1finbotbackend-production.up.railway.app/docs) |
+| **📂 Frontend Repo** | [GitHub - Frontend](https://github.com/kuralnithi/CB_A1_FINBOT_FRONTEND) |
+| **📂 Backend Repo** | [GitHub - Backend](https://github.com/kuralnithi/CB_A1_FINBOT_BACKEND) |
+| **📢 LinkedIn Post** | [View LinkedIn Update](https://www.linkedin.com/posts/kural-nithi-0b967122b_ai-rag-generativeai-activity-7444815302963585024-m4l7?utm_source=share&utm_medium=member_desktop&rcm=ACoAADmVtk0BmNqWq-K8895ZhmcAzBKhjfXB5oY) |
+
 ## Required Environment Variables (HF Secrets)
 
 Set these in your Hugging Face Space settings:
