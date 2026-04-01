@@ -10,6 +10,7 @@ from qdrant_client.models import (
     Distance,
     VectorParams,
     PointStruct,
+    PayloadSchemaType,
 )
 from sentence_transformers import SentenceTransformer
 
@@ -61,6 +62,19 @@ def ensure_collection_exists(client: QdrantClient, collection_name: str, vector_
             ),
         )
         logger.info(f"Created Qdrant collection: {collection_name}")
+        
+        # Create explicit payload indexes needed for RBAC metadata filtering
+        client.create_payload_index(
+            collection_name=collection_name,
+            field_name="collection",
+            field_schema=PayloadSchemaType.KEYWORD,
+        )
+        client.create_payload_index(
+            collection_name=collection_name,
+            field_name="access_roles",
+            field_schema=PayloadSchemaType.KEYWORD,
+        )
+        logger.info(f"Created payload indexes for 'collection' and 'access_roles' in {collection_name}")
     else:
         logger.info(f"Qdrant collection already exists: {collection_name}")
 

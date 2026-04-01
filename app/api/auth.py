@@ -76,7 +76,8 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
         user=User(
             username=db_user.username,
             role=db_user.role,
-            display_name=db_user.display_name
+            display_name=db_user.display_name,
+            extra_roles=[r for r in (db_user.extra_roles or "").split(",") if r],
         ),
     )
 

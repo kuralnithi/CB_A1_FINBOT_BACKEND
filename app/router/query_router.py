@@ -85,9 +85,9 @@ class HybridQueryRouter:
                 route_name = "cross_department_route"
             
             # --- PHASE 3: Admin Bypass for Off-Topic/Harmful ---
-            # If Admin (c_level), we search anyway but keep the route name for metadata
+            # If Admin (c_level or extra c_level), we search anyway but keep the route name for metadata
             denial_message = ""
-            if route_name == "off_topic" and user_role != "c_level":
+            if route_name == "off_topic" and (user_role != "c_level" and "c_level" not in (extra_roles or [])):
                 denial_message = "Your query appears to be unrelated to FinSolve's business domains."
                 return "off_topic", [], denial_message
             

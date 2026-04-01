@@ -113,9 +113,9 @@ def build_qdrant_filter(role: str, target_collections: list[str] | None = None, 
     else:
         collections_to_search = accessible
 
-    # SUPER ADMIN BYPASS: If c_level, search everything (no filters)
-    if role == "c_level":
-        logger.info(f"Super Admin bypass: Searching all collections for {role}")
+    # SUPER ADMIN BYPASS: If c_level (primary or extra), search everything (no filters)
+    if role == "c_level" or "c_level" in (extra_roles or []):
+        logger.info(f"Super Admin bypass: Searching all collections for {role} (extra: {extra_roles})")
         return None
 
     # Build the filter for all other roles

@@ -66,8 +66,8 @@ async def retrieve_chunks(
         )
         
         # ─── FALLBACK: Unfiltered search for c_level if no results ─────────
-        if not results and role == "c_level":
-            logger.warning("[RETRIEVER] No results with filter. Attempting unfiltered search for Admin bypass.")
+        if not results and (role == "c_level" or "c_level" in (extra_roles or [])):
+            logger.warning(f"[RETRIEVER] No results with filter. Attempting unfiltered search for Admin bypass (role={role}, extra={extra_roles}).")
             results = await client.search(
                 collection_name=settings.QDRANT_COLLECTION_NAME,
                 query_vector=query_vector,

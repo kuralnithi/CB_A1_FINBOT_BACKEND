@@ -97,11 +97,11 @@ OFF_TOPIC_PATTERNS = [
 
 BUSINESS_KEYWORDS = [
     "finsolve", "company", "employee", "policy", "leave", "handbook",
-    "financial", "revenue", "budget", "report", "quarterly", "annual",
+    "financial", "finance", "revenue", "budget", "report", "quarterly", "annual",
     "engineering", "architecture", "api", "system", "deployment", "incident",
     "marketing", "campaign", "brand", "customer", "competitor",
     "hr", "benefit", "salary", "performance", "onboarding",
-    "document", "department", "team", "business", "corporate",
+    "document", "department", "team", "business", "corporate", "general",
 ]
 
 
