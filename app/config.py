@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # ─── LLM Configuration ──────────────────────────────────────────────────
     LLM_PROVIDER: str = "groq"  # options: "groq", "ollama", "gemini"
-    LLM_MODEL_NAME: str = "llama-3.1-8b-instant"
+    LLM_MODEL_NAME: str = "llama-3.3-70b-versatile"
     GROQ_API_KEY: str = ""
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     GOOGLE_API_KEY: str = ""
