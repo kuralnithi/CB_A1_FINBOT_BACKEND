@@ -222,11 +222,9 @@ async def recommend_ground_truth(
     user: User = Depends(require_admin),
 ):
     """Use the LLM to suggest a professional ground truth for evaluation."""
-    from langchain_groq import ChatGroq
-    from app.config import get_settings
+    from app.services.llm_factory import get_llm
 
-    settings = get_settings()
-    llm = ChatGroq(api_key=settings.GROQ_API_KEY, model_name=settings.LLM_MODEL_NAME)
+    llm = get_llm(temperature=0.1)
 
     prompt = f"""You are an AI quality engineer. Given a user's query and the bot's current answer,
 provide a professional, concise, and accurate "Ground Truth" answer suitable for an evaluation dataset.

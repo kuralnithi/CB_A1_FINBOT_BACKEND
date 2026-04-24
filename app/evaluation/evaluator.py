@@ -25,17 +25,22 @@ from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from app.config import get_settings
 from app.models import User
 from app.services.rag_service import process_query
+from app.services.llm_factory import get_llm
 from app.evaluation.dataset import EVALUATION_DATASET
 
 logger = logging.getLogger(__name__)
 
 
 def _get_ragas_llm():
-    """Get LLM wrapper for RAGAS evaluation."""
+    """
+    Get LLM wrapper for RAGAS evaluation.
+    We use ChatGroq as the "Judge" to ensure high reasoning capability
+    for the evaluation phase, while the actual pipeline uses Ollama.
+    """
     settings = get_settings()
     llm = ChatGroq(
         api_key=settings.GROQ_API_KEY,
-        model_name=settings.LLM_MODEL_NAME,
+        model_name="llama-3.3-70b-versatile",
         temperature=0,
     )
     return LangchainLLMWrapper(llm)
@@ -50,10 +55,11 @@ def _get_ragas_embeddings():
     return LangchainEmbeddingsWrapper(embeddings)
 
 
-def run_evaluation(
+async def run_evaluation(
     skip_rbac: bool = False,
     skip_router: bool = False,
     skip_guardrails: bool = False,
+    limit: int = None,
     label: str = "full_pipeline",
 ) -> dict:
     """
@@ -76,7 +82,11 @@ def run_evaluation(
     answers = []
     contexts = []
 
-    for entry in EVALUATION_DATASET:
+    eval_data = EVALUATION_DATASET
+    if limit:
+        eval_data = eval_data[:limit]
+
+    for entry in eval_data:
         question = entry["question"]
         ground_truth = entry["ground_truth"]
         test_role = entry["test_role"]
@@ -90,7 +100,7 @@ def run_evaluation(
         user = User(username=test_role, role=test_role, display_name=test_role)
 
         try:
-            response = process_query(
+            response = await process_query(
                 query=question,
                 user=user,
                 session_id=f"eval_{label}_{test_role}",
@@ -163,7 +173,7 @@ def run_evaluation(
         }
 
 
-def run_ablation_study() -> list[dict]:
+async def run_ablation_study() -> list[dict]:
     """
     Run ablation study with 4 configurations:
     1. Full pipeline
@@ -176,16 +186,16 @@ def run_ablation_study() -> list[dict]:
     results = []
 
     # Config 1: Full pipeline
-    results.append(run_evaluation(label="full_pipeline"))
+    results.append(await run_evaluation(label="full_pipeline"))
 
     # Config 2: Without RBAC
-    results.append(run_evaluation(skip_rbac=True, label="without_rbac"))
+    results.append(await run_evaluation(skip_rbac=True, label="without_rbac"))
 
     # Config 3: Without Router
-    results.append(run_evaluation(skip_router=True, label="without_router"))
+    results.append(await run_evaluation(skip_router=True, label="without_router"))
 
     # Config 4: Without Guardrails
-    results.append(run_evaluation(skip_guardrails=True, label="without_guardrails"))
+    results.append(await run_evaluation(skip_guardrails=True, label="without_guardrails"))
 
     # Save results
     try:

@@ -2,7 +2,7 @@
 LLM chain — generates answers using Groq with strict citation requirements.
 """
 import logging
-from langchain_groq import ChatGroq
+from app.services.llm_factory import get_llm
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.config import get_settings
@@ -47,12 +47,8 @@ async def generate_answer(
     """
     settings = get_settings()
 
-    llm = ChatGroq(
-        api_key=settings.GROQ_API_KEY,
-        model_name=settings.LLM_MODEL_NAME,
-        temperature=0.1,
-        max_tokens=1500,
-    )
+    # Use the unified factory instead of hardcoded ChatGroq
+    llm = get_llm(temperature=0.1, max_tokens=1500)
 
     messages = [SystemMessage(content=SYSTEM_PROMPT)]
     if chat_history:

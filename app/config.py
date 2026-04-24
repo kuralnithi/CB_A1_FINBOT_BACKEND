@@ -11,9 +11,12 @@ from functools import lru_cache
 class Settings(BaseSettings):
     """Application settings — loaded from .env at startup."""
 
-    # ─── LLM (Groq) ──────────────────────────────────────────────────────────
-    GROQ_API_KEY: str = ""
+    # ─── LLM Configuration ──────────────────────────────────────────────────
+    LLM_PROVIDER: str = "groq"  # options: "groq", "ollama", "gemini"
     LLM_MODEL_NAME: str = "llama-3.1-8b-instant"
+    GROQ_API_KEY: str = ""
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    GOOGLE_API_KEY: str = ""
 
     # ─── Embeddings ───────────────────────────────────────────────────────────
     EMBEDDING_MODEL_NAME: str = "BAAI/bge-small-en-v1.5"
