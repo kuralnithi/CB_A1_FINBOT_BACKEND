@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Ensure Python can find the 'app' module from any script
+export PYTHONPATH=/app:$PYTHONPATH
+
 # ─── 1. Database Migrations ──────────────────────────────────────────────────
 echo "══════════════════════════════════════════════"
 echo "  [1/3] Running database migrations..."
@@ -22,7 +25,7 @@ else
 fi
 
 # ─── 3. Start the Application ────────────────────────────────────────────────
-# Render injects $PORT. Default to 10000 if not set.
+# Railway/Render inject $PORT. Default to 10000 if not set.
 PORT="${PORT:-10000}"
 
 echo "══════════════════════════════════════════════"
