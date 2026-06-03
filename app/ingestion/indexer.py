@@ -22,14 +22,45 @@ logger = logging.getLogger(__name__)
 _embedding_model = None
 
 
+class HuggingFaceAPIWrapper:
+    """Wrapper to add delays and batching to HuggingFace Inference API"""
+    def __init__(self):
+        from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
+        import os
+        from app.config import get_settings
+        settings = get_settings()
+        api_key = os.environ.get("HF_TOKEN")
+        if not api_key:
+            raise ValueError("HF_TOKEN environment variable is not set")
+        self.embedder = HuggingFaceInferenceAPIEmbeddings(
+            api_key=api_key,
+            model_name=settings.EMBEDDING_MODEL_NAME
+        )
+        
+    def embed_documents(self, texts):
+        import time
+        import logging
+        logger = logging.getLogger(__name__)
+        res = []
+        batch_size = 32
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i + batch_size]
+            res.extend(self.embedder.embed_documents(batch))
+            if i + batch_size < len(texts):
+                logger.info(f"Embedded batch {i // batch_size + 1}, waiting to avoid rate limit...")
+                time.sleep(2)
+        return res
+        
+    def embed_query(self, query):
+        return self.embedder.embed_query(query)
+
 def get_embedding_model():
     """Get or create the embedding model (cached)."""
     global _embedding_model
     if _embedding_model is None:
         settings = get_settings()
-        logger.info(f"Loading local SentenceTransformer model via LangChain: {settings.EMBEDDING_MODEL_NAME}")
-        from langchain_community.embeddings import HuggingFaceEmbeddings
-        _embedding_model = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL_NAME)
+        logger.info(f"Loading cloud HuggingFace Inference API model: {settings.EMBEDDING_MODEL_NAME}")
+        _embedding_model = HuggingFaceAPIWrapper()
     return _embedding_model
 
 
