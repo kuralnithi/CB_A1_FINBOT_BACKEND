@@ -40,12 +40,37 @@ async def lifespan(app: FastAPI):
     try:
         from app.db.session import engine
         from app.db.models import Base
+        from sqlalchemy.ext.asyncio import AsyncSession
+        from sqlalchemy import select
+        from app.db.models import UserDB
+        from app.api.deps import get_password_hash
+        from app.config import get_settings
+
         if engine is not None:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             logger.info("✅ Database tables created/verified successfully")
+            
+            # Auto-create admin user
+            settings = get_settings()
+            admin_username = settings.ADMIN_USER or "finbot_admin"
+            admin_password = settings.ADMIN_PASS or "ChangeThisPassword123!"
+            
+            async with AsyncSession(engine) as session:
+                result = await session.execute(select(UserDB).where(UserDB.username == admin_username))
+                admin = result.scalar_one_or_none()
+                if not admin:
+                    admin_user = UserDB(
+                        username=admin_username,
+                        hashed_password=get_password_hash(admin_password),
+                        role="c_level",
+                        display_name="System Administrator"
+                    )
+                    session.add(admin_user)
+                    await session.commit()
+                    logger.info(f"✅ Auto-created admin user: {admin_username}")
     except Exception as e:
-        logger.error(f"⚠️ Failed to create database tables: {e}")
+        logger.error(f"⚠️ Failed to create database tables or admin user: {e}")
         
     logger.info("✅ FinBot is ready to serve requests")
     yield
