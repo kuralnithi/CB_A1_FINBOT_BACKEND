@@ -6,8 +6,6 @@ Unauthorized chunks are NEVER retrieved.
 """
 import logging
 import anyio
-from sentence_transformers import SentenceTransformer
-
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import Filter
 

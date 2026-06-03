@@ -12,7 +12,6 @@ from qdrant_client.models import (
     PointStruct,
     PayloadSchemaType,
 )
-from sentence_transformers import SentenceTransformer
 
 from app.config import get_settings
 from app.models import ChunkMetadata
@@ -20,16 +19,32 @@ from app.models import ChunkMetadata
 logger = logging.getLogger(__name__)
 
 # Module-level cache for the embedding model
-_embedding_model: SentenceTransformer | None = None
+_embedding_model = None
 
 
-def get_embedding_model() -> SentenceTransformer:
+class GoogleEmbeddingWrapper:
+    """Wrapper to make LangChain's Google GenAI embeddings look like SentenceTransformer."""
+    def __init__(self):
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
+        # text-embedding-004 is the latest and outputs 768 dimensions
+        self.embedder = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+        
+    def encode(self, texts, **kwargs):
+        import numpy as np
+        if isinstance(texts, str):
+            res = self.embedder.embed_query(texts)
+            return np.array(res)
+        else:
+            res = self.embedder.embed_documents(texts)
+            return np.array(res)
+
+def get_embedding_model():
     """Get or create the embedding model (cached)."""
     global _embedding_model
     if _embedding_model is None:
         settings = get_settings()
-        logger.info(f"Loading embedding model: {settings.EMBEDDING_MODEL_NAME}")
-        _embedding_model = SentenceTransformer(settings.EMBEDDING_MODEL_NAME)
+        logger.info(f"Loading lightweight Google GenAI embedding model to prevent OOM.")
+        _embedding_model = GoogleEmbeddingWrapper()
     return _embedding_model
 
 
@@ -49,7 +64,7 @@ def get_async_qdrant_client() -> AsyncQdrantClient:
     return AsyncQdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
 
 
-def ensure_collection_exists(client: QdrantClient, collection_name: str, vector_size: int = 384):
+def ensure_collection_exists(client: QdrantClient, collection_name: str, vector_size: int = 768):
     """Create Qdrant collection if it doesn't exist."""
     collections = [c.name for c in client.get_collections().collections]
 
@@ -97,7 +112,7 @@ def index_chunks(chunks: list[dict]) -> int:
     client = get_qdrant_client()
 
     # Ensure collection exists
-    ensure_collection_exists(client, settings.QDRANT_COLLECTION_NAME, vector_size=384)
+    ensure_collection_exists(client, settings.QDRANT_COLLECTION_NAME, vector_size=768)
 
     # Generate embeddings in batches
     texts = [c["text"] for c in chunks]

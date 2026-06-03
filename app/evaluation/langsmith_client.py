@@ -60,8 +60,7 @@ def run_evaluation(dataset_name: str = "finbot_eval"):
         from langsmith.schemas import Run, Example
         from app.services.rag_service import process_query
         from app.models import User
-        from sentence_transformers import SentenceTransformer, util
-        import torch
+
         
         # ─── REAL-TIME PROGRESS TRACKING ───────────────────
         from app.evaluation.status_tracker import update_eval_status, reset_eval_status
@@ -74,13 +73,11 @@ def run_evaluation(dataset_name: str = "finbot_eval"):
         # Counter for progress
         processed_count = 0
 
-        # Load a small, fast model for semantic similarity
-        model = SentenceTransformer('all-MiniLM-L6-v2')
-        
         # Per-example ledger for saving to our DB
         per_example_log = []
 
         def similarity_evaluator(run: Run, example: Example) -> dict:
+            from difflib import SequenceMatcher
             actual = (run.outputs or {}).get("answer", "") or ""
             expected = (example.outputs or {}).get("answer", "") or ""
             
@@ -88,11 +85,8 @@ def run_evaluation(dataset_name: str = "finbot_eval"):
             if actual.strip().lower() == expected.strip().lower():
                 score = 1.0
             else:
-                # Compute semantic similarity
-                embeddings = model.encode([actual, expected], convert_to_tensor=True)
-                score = float(util.cos_sim(embeddings[0], embeddings[1])[0][0])
-                # Ensure it's in 0-1 range (cosine similarity can be negative)
-                score = max(0.0, score)
+                # Compute basic string similarity to avoid PyTorch OOM
+                score = SequenceMatcher(None, actual.lower(), expected.lower()).ratio()
             
             per_example_log.append({
                 "query": (example.inputs or {}).get("question", ""),
