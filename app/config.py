@@ -5,6 +5,7 @@ All sensitive defaults are empty strings — real values MUST come from .env.
 """
 from pathlib import Path
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
 
 
@@ -46,6 +47,17 @@ class Settings(BaseSettings):
 
     # ─── PostgreSQL ───────────────────────────────────────────────────────────
     DATABASE_URL: str = ""
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def sanitize_database_url(cls, v: str) -> str:
+        if not v:
+            return v
+        # Remove surrounding quotes if accidentally copied
+        v = v.strip().strip("'").strip('"')
+        # Remove channel_binding parameter that breaks SQLAlchemy parser
+        v = v.replace("&channel_binding=require", "").replace("?channel_binding=require", "")
+        return v
 
     # ─── Admin Bootstrap ──────────────────────────────────────────────────────
     ADMIN_USER: str = "finbot_admin"
