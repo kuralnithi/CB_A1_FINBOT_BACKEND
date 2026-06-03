@@ -35,6 +35,18 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application startup and shutdown events."""
     logger.info("🚀 FinBot starting up...")
+    
+    # Auto-create tables if Alembic failed or timed out
+    try:
+        from app.db.session import engine
+        from app.db.models import Base
+        if engine is not None:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("✅ Database tables created/verified successfully")
+    except Exception as e:
+        logger.error(f"⚠️ Failed to create database tables: {e}")
+        
     logger.info("✅ FinBot is ready to serve requests")
     yield
     logger.info("🛑 FinBot shutting down...")
