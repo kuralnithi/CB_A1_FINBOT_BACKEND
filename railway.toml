@@ -1,0 +1,14 @@
+# ─── Railway Configuration ────────────────────────────────────────────────────
+# https://docs.railway.app/reference/config-as-code
+
+[build]
+# Railway auto-detects Dockerfile — no extra config needed
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Health check — Railway pings this to verify the service is alive
+healthcheckPath = "/health"
+healthcheckTimeout = 180
+# Graceful shutdown timeout (seconds)
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
