@@ -26,8 +26,7 @@ class GoogleEmbeddingWrapper:
     """Wrapper to make LangChain's Google GenAI embeddings look like SentenceTransformer."""
     def __init__(self):
         from langchain_google_genai import GoogleGenerativeAIEmbeddings
-        # text-embedding-004 is the latest and outputs 768 dimensions
-        self.embedder = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+        self.embedder = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2")
         
     def encode(self, texts, **kwargs):
         import numpy as np
@@ -64,7 +63,7 @@ def get_async_qdrant_client() -> AsyncQdrantClient:
     return AsyncQdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
 
 
-def ensure_collection_exists(client: QdrantClient, collection_name: str, vector_size: int = 768):
+def ensure_collection_exists(client: QdrantClient, collection_name: str, vector_size: int = 3072):
     """Create Qdrant collection if it doesn't exist."""
     collections = [c.name for c in client.get_collections().collections]
 
@@ -112,7 +111,7 @@ def index_chunks(chunks: list[dict]) -> int:
     client = get_qdrant_client()
 
     # Ensure collection exists
-    ensure_collection_exists(client, settings.QDRANT_COLLECTION_NAME, vector_size=768)
+    ensure_collection_exists(client, settings.QDRANT_COLLECTION_NAME, vector_size=3072)
 
     # Generate embeddings in batches
     texts = [c["text"] for c in chunks]
