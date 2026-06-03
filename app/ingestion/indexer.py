@@ -22,14 +22,36 @@ logger = logging.getLogger(__name__)
 _embedding_model = None
 
 
+class GoogleEmbeddingWrapper:
+    """Wrapper to make LangChain's Google GenAI embeddings look like SentenceTransformer."""
+    def __init__(self):
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
+        self.embedder = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2")
+        
+    def encode(self, texts, **kwargs):
+        import numpy as np
+        import time
+        if isinstance(texts, str):
+            res = self.embedder.embed_query(texts)
+            return np.array(res)
+        else:
+            res = []
+            # Free tier Google API has strict TPM/RPM limits. Batching with delays!
+            api_batch_size = 20
+            for i in range(0, len(texts), api_batch_size):
+                batch = texts[i:i + api_batch_size]
+                res.extend(self.embedder.embed_documents(batch))
+                if i + api_batch_size < len(texts):
+                    time.sleep(3) # Wait 3 seconds to avoid rate limits
+            return np.array(res)
+
 def get_embedding_model():
     """Get or create the embedding model (cached)."""
     global _embedding_model
     if _embedding_model is None:
         settings = get_settings()
-        logger.info(f"Loading local SentenceTransformer model via LangChain: {settings.EMBEDDING_MODEL_NAME}")
-        from langchain_community.embeddings import HuggingFaceEmbeddings
-        _embedding_model = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL_NAME)
+        logger.info(f"Loading lightweight Google GenAI embedding model to prevent OOM.")
+        _embedding_model = GoogleEmbeddingWrapper()
     return _embedding_model
 
 
@@ -49,7 +71,7 @@ def get_async_qdrant_client() -> AsyncQdrantClient:
     return AsyncQdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
 
 
-def ensure_collection_exists(client: QdrantClient, collection_name: str, vector_size: int = 384):
+def ensure_collection_exists(client: QdrantClient, collection_name: str, vector_size: int = 3072):
     """Create Qdrant collection if it doesn't exist."""
     collections = [c.name for c in client.get_collections().collections]
 
@@ -97,12 +119,18 @@ def index_chunks(chunks: list[dict]) -> int:
     client = get_qdrant_client()
 
     # Ensure collection exists
-    ensure_collection_exists(client, settings.QDRANT_COLLECTION_NAME, vector_size=384)
+    ensure_collection_exists(client, settings.QDRANT_COLLECTION_NAME, vector_size=3072)
 
-    # Generate embeddings (HuggingFaceEmbeddings batches internally)
+    # Generate embeddings in batches
     texts = [c["text"] for c in chunks]
-    logger.info(f"Generating embeddings for {len(texts)} chunks using local model...")
-    all_embeddings = model.embed_documents(texts)
+    batch_size = 64
+    all_embeddings = []
+
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        embeddings = model.encode(batch, normalize_embeddings=True, show_progress_bar=False)
+        all_embeddings.extend(embeddings.tolist())
+        logger.info(f"Embedded batch {i // batch_size + 1}/{(len(texts) + batch_size - 1) // batch_size}")
 
     # Build Qdrant points
     points = []
