@@ -37,7 +37,7 @@ async def retrieve_chunks(
     logger.debug(f"Generating embedding for query: '{query[:50]}...'")
     try:
         query_vector = await anyio.to_thread.run_sync(
-            lambda: model.encode(query, normalize_embeddings=True).tolist()
+            lambda: model.embed_query(query)
         )
     except Exception as e:
         logger.error(f"Embedding generation failed: {e}", exc_info=True)
