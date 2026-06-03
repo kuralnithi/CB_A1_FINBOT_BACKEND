@@ -30,11 +30,19 @@ class GoogleEmbeddingWrapper:
         
     def encode(self, texts, **kwargs):
         import numpy as np
+        import time
         if isinstance(texts, str):
             res = self.embedder.embed_query(texts)
             return np.array(res)
         else:
-            res = self.embedder.embed_documents(texts)
+            res = []
+            # Free tier Google API has strict TPM/RPM limits. Batching with delays!
+            api_batch_size = 20
+            for i in range(0, len(texts), api_batch_size):
+                batch = texts[i:i + api_batch_size]
+                res.extend(self.embedder.embed_documents(batch))
+                if i + api_batch_size < len(texts):
+                    time.sleep(3) # Wait 3 seconds to avoid rate limits
             return np.array(res)
 
 def get_embedding_model():
