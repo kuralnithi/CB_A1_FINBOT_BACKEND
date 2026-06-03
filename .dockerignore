@@ -1,0 +1,52 @@
+# ─── Version Control ──────────────────────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+
+# ─── Virtual Environments ─────────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ─── Environment & Secrets ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── IDE & Editor ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── Testing ──────────────────────────────────────────────────────────────────
+tests/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# ─── Build Artifacts ──────────────────────────────────────────────────────────
+build/
+dist/
+wheels/
+*.egg-info
+
+# ─── Lock Files (deps installed from requirements.txt) ───────────────────────
+uv.lock
+
+# ─── Debug Scripts ────────────────────────────────────────────────────────────
+debug_*.py
+check_counts.py
+
+# ─── Documentation ────────────────────────────────────────────────────────────
+README.md
+CHANGELOG.md
+*.md
+!requirements.txt
+
+# ─── Docker ───────────────────────────────────────────────────────────────────
+docker-compose.yml
+Dockerfile
+.dockerignore

@@ -1,6 +1,7 @@
 # FastAPI
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
+gunicorn==23.0.0
 python-multipart==0.0.20
 python-jose[cryptography]==3.3.0
 bcrypt
@@ -10,6 +11,7 @@ langchain==0.3.14
 langchain-community==0.3.14
 langchain-groq==0.2.4
 langchain-ollama==0.2.2
+langchain-google-genai>=2.0.0
 
 # Embeddings
 sentence-transformers==3.3.1

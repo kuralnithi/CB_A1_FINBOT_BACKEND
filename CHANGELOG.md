@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - 2026-04-24
+
+### Changed
+- Changed default LLM model name to `llama-3-70b-versatile` in backend config.
+
 ## [0.1.1] - 2026-04-24
 
 ### Changed
