@@ -30,12 +30,13 @@ echo "  [3/3] Starting FinBot API on port ${PORT}..."
 echo "══════════════════════════════════════════════"
 
 # Use 'exec' to replace shell with the server process (PID 1 for signal handling).
-# Gunicorn + UvicornWorker = production-grade multi-process ASGI server.
+# Gunicorn + UvicornWorker = production-grade ASGI server.
+# Workers=1 to fit within Render free tier 512MB RAM. Increase to 2-4 on paid plans.
 exec gunicorn main:app \
     --worker-class uvicorn.workers.UvicornWorker \
     --bind "0.0.0.0:${PORT}" \
-    --workers 2 \
-    --timeout 120 \
+    --workers 1 \
+    --timeout 180 \
     --graceful-timeout 30 \
     --access-logfile - \
     --error-logfile -
