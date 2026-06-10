@@ -53,9 +53,10 @@ async def setup_admin(db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """
-    Login with username and password.
-    """
+    """Login with username and password."""
+    # Caller: file:///c:/kural/codebasics/ASSIGNMENTS/A-1%20FINBOT/frontend/src/lib/api/auth.ts  login()
+    # UI:     file:///c:/kural/codebasics/ASSIGNMENTS/A-1%20FINBOT/frontend/src/app/page.tsx  handleLogin()
+    # Token:  c:\kural\codebasics\ASSIGNMENTS\A-1 FINBOT\backend\app\api\deps.py  create_access_token()
     username = request.username.lower().strip()
 
     result = await db.execute(select(UserDB).where(UserDB.username == username))

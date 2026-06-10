@@ -31,7 +31,7 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 
-@router.get("/queries")
+@router.get("")
 async def list_queries(
     user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
@@ -60,7 +60,7 @@ async def list_queries(
         raise HTTPException(status_code=500, detail="Failed to fetch queries")
 
 
-@router.delete("/queries/{query_id}")
+@router.delete("/{query_id}")
 async def delete_query_log(
     query_id: int,
     user: User = Depends(require_admin),

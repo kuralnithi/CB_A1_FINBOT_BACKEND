@@ -36,6 +36,8 @@ class PipelineState(TypedDict):
 
 async def pipeline_node(state: PipelineState) -> dict:
     """Core RAG pipeline execution."""
+    # Caller: c:\kural\codebasics\ASSIGNMENTS\A-1 FINBOT\backend\app\api\chat.py  chat() / chat_stream()
+    # via:    c:\kural\codebasics\ASSIGNMENTS\A-1 FINBOT\backend\app\services\rag_service.py  process_query()
     query = state.get("query", "")
     user_state = state.get("user")
     session_id = state.get("session_id", "unknown")
@@ -65,10 +67,11 @@ async def pipeline_node(state: PipelineState) -> dict:
 
     try:
         # ─── Step 1: Input Guardrails ──────────────────────────────────────────
+        # Code: c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\backend\\app\\guardrails\\input_guards.py
         step_start = time.perf_counter()
         logger.info(f"[PIPELINE] Step 1: Input guardrails — user={user.username}")
 
-        input_warnings = run_input_guardrails(query, session_id)
+        query, input_warnings = run_input_guardrails(query, session_id)
         if input_warnings:
             has_error = any(w.severity == "error" for w in input_warnings)
             if has_error:
@@ -78,11 +81,14 @@ async def pipeline_node(state: PipelineState) -> dict:
                 response.answer = input_warnings[0].message
                 logger.warning(f"[PIPELINE] Blocked by input guardrails: {input_warnings[0].type}")
                 return {"messages": [AIMessage(content=response.answer)], "response": response}
+            # If no error, just add warnings and continue with the (potentially masked) query
             response.guardrail_warnings.extend(input_warnings)
         
         logger.debug(f"Step 1 completed in {time.perf_counter() - step_start:.3f}s")
 
         # ─── Step 2: Semantic Routing ──────────────────────────────────────────
+        # Code: c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\backend\\app\\router\\query_router.py
+        # Routes: c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\backend\\app\\router\\routes.py
         step_start = time.perf_counter()
         logger.info(f"[PIPELINE] Step 2: Semantic routing")
 
@@ -91,6 +97,7 @@ async def pipeline_node(state: PipelineState) -> dict:
         logger.debug(f"Step 2 completed in {time.perf_counter() - step_start:.3f}s")
 
         # ─── Step 3: RBAC Check ───────────────────────────────────────────────
+        # Code: c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\backend\\app\\rbac\\access_control.py
         if denial_message:
             response.blocked = True
             response.blocked_reason = denial_message
@@ -104,6 +111,7 @@ async def pipeline_node(state: PipelineState) -> dict:
             return {"messages": [AIMessage(content=response.answer)], "response": response}
 
         # ─── Step 4: Retrieval ───────────────────────────────────────────────
+        # Code: c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\backend\\app\\retrieval\\retriever.py
         step_start = time.perf_counter()
         
         if route_name == "greetings_route":
@@ -140,11 +148,14 @@ async def pipeline_node(state: PipelineState) -> dict:
                 return {"messages": [AIMessage(content=response.answer)], "response": response}
         else:
             # ─── Step 5: Context Building ─────────────────────────────────────────
+            # Code: c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\backend\\app\\retrieval\\context_builder.py
             step_start = time.perf_counter()
             context = build_context(chunks)
             logger.debug(f"Step 5 completed in {time.perf_counter() - step_start:.3f}s")
 
         # ─── Step 6: LLM Generation ──────────────────────────────────────────
+        # Code: c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\backend\\app\\retrieval\\llm_chain.py
+        # Factory: c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\backend\\app\\services\\llm_factory.py
         step_start = time.perf_counter()
         logger.info("[PIPELINE] Step 6: LLM generation")
 
@@ -153,6 +164,7 @@ async def pipeline_node(state: PipelineState) -> dict:
         logger.debug(f"Step 6 completed in {time.perf_counter() - step_start:.3f}s")
 
         # ─── Step 7: Output Guardrails ────────────────────────────────────────
+        # Code: c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\backend\\app\\guardrails\\output_guards.py
         step_start = time.perf_counter()
         logger.info("[PIPELINE] Step 7: Output guardrails")
 

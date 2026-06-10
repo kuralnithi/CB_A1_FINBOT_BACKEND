@@ -14,7 +14,7 @@ from app.api.admin.evaluation import router as evaluation_router
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
-router.include_router(documents_router)
-router.include_router(users_router)
-router.include_router(queries_router)
-router.include_router(evaluation_router)
+router.include_router(documents_router, prefix="/documents")
+router.include_router(users_router, prefix="/users")
+router.include_router(queries_router, prefix="/queries")
+router.include_router(evaluation_router, prefix="/eval")

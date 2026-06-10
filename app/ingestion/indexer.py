@@ -27,9 +27,9 @@ def get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
         settings = get_settings()
-        logger.info(f"Loading local FastEmbed embedding model (Lightweight/ONNX): {settings.EMBEDDING_MODEL_NAME}")
-        from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
-        _embedding_model = FastEmbedEmbeddings(model_name=settings.EMBEDDING_MODEL_NAME)
+        logger.info(f"Loading local HuggingFace embedding model (sentence-transformers): {settings.EMBEDDING_MODEL_NAME}")
+        from langchain_community.embeddings import HuggingFaceEmbeddings
+        _embedding_model = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL_NAME)
     return _embedding_model
 
 

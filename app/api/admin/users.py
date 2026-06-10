@@ -47,7 +47,7 @@ class ExtraRolesUpdate(BaseModel):
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 
-@router.get("/users")
+@router.get("")
 async def list_users(
     user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
@@ -67,7 +67,7 @@ async def list_users(
     ]
 
 
-@router.post("/users", response_model=User)
+@router.post("", response_model=User)
 async def create_user(
     new_user: UserCreate,
     user: User = Depends(require_admin),
@@ -94,7 +94,7 @@ async def create_user(
     return User(username=db_user.username, role=db_user.role, display_name=db_user.display_name)
 
 
-@router.patch("/users/{username}/role", response_model=User)
+@router.patch("/{username}/role", response_model=User)
 async def update_user_role(
     username: str,
     payload: RoleUpdate,
@@ -124,7 +124,7 @@ async def update_user_role(
     )
 
 
-@router.patch("/users/{username}/extra-roles")
+@router.patch("/{username}/extra-roles")
 async def update_user_extra_roles(
     username: str,
     payload: ExtraRolesUpdate,
@@ -150,7 +150,7 @@ async def update_user_extra_roles(
     return {"username": db_user.username, "role": db_user.role, "extra_roles": cleaned}
 
 
-@router.delete("/users/{username}")
+@router.delete("/{username}")
 async def delete_user(
     username: str,
     admin: User = Depends(require_admin),

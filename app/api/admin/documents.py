@@ -67,7 +67,7 @@ async def get_ingestion_status(user: User = Depends(require_admin)):
 # ─── Document CRUD ────────────────────────────────────────────────────────────
 
 
-@router.get("/documents", response_model=list[DocumentInfo])
+@router.get("", response_model=list[DocumentInfo])
 async def list_documents(user: User = Depends(require_admin)):
     """List all indexed documents with chunk counts from Qdrant."""
     settings = get_settings()
@@ -106,7 +106,7 @@ async def list_documents(user: User = Depends(require_admin)):
         return []
 
 
-@router.delete("/documents/{filename}")
+@router.delete("/{filename}")
 async def delete_document(filename: str, user: User = Depends(require_admin)):
     """Delete all chunks for a specific document from Qdrant."""
     settings = get_settings()

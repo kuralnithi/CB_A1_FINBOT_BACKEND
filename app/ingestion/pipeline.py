@@ -115,6 +115,8 @@ def run_ingestion(data_dir: str | None = None) -> IngestResponse:
 
     # Step 5: Index into Qdrant
     logger.info(f"Indexing {len(all_chunks)} chunks into Qdrant...")
+    update_status("processing", 65, "Downloading/Loading Embedding Model... (This may take a few minutes on first run)")
+
     
     # NEW: Ensure collection exists BEFORE we do anything
     try:

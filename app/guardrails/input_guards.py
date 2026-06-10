@@ -155,18 +155,27 @@ PII_PATTERNS = {
 }
 
 
-def detect_pii(query: str) -> GuardrailWarning | None:
-    """Detect if user submitted personal identifiable information."""
+def detect_pii(query: str) -> tuple[str, GuardrailWarning | None]:
+    """Detect if user submitted personal identifiable information and mask it."""
+    warning = None
+    masked_query = query
+    detected_types = []
+
     for pii_type, pattern in PII_PATTERNS.items():
-        if re.search(pattern, query):
-            logger.warning(f"GUARDRAIL: PII detected — type: {pii_type}")
-            return GuardrailWarning(
-                type="pii",
-                message=f"Your query appears to contain personal information ({pii_type}). "
-                        "Please remove any sensitive data before submitting.",
-                severity="error",
-            )
-    return None
+        if re.search(pattern, masked_query):
+            detected_types.append(pii_type)
+            # Mask the detected pattern
+            masked_query = re.sub(pattern, f"[{pii_type.upper()}_REDACTED]", masked_query)
+
+    if detected_types:
+        types_str = ", ".join(detected_types)
+        logger.warning(f"GUARDRAIL: PII detected and masked — types: {types_str}")
+        warning = GuardrailWarning(
+            type="pii",
+            message=f"We masked personal information ({types_str}) in your query for security purposes.",
+            severity="warning",
+        )
+    return masked_query, warning
 
 
 # ─── Rate Limiting ─────────────────────────────────────────────────────────────
@@ -189,11 +198,12 @@ def check_rate_limit(session_id: str) -> GuardrailWarning | None:
 
 # ─── Orchestrator ──────────────────────────────────────────────────────────────
 
-def run_input_guardrails(query: str, session_id: str) -> list[GuardrailWarning]:
+def run_input_guardrails(query: str, session_id: str) -> tuple[str, list[GuardrailWarning]]:
     """
     Run all input guardrail checks.
 
-    Returns list of warnings. If any have severity='error', the query should be blocked.
+    Returns a tuple of (masked_query, list_of_warnings).
+    If any warning has severity='error', the query should be blocked by the orchestrator.
     """
     warnings: list[GuardrailWarning] = []
 
@@ -201,30 +211,30 @@ def run_input_guardrails(query: str, session_id: str) -> list[GuardrailWarning]:
     rate_warning = check_rate_limit(session_id)
     if rate_warning:
         warnings.append(rate_warning)
-        return warnings  # Block immediately
+        return query, warnings  # Block immediately
 
     # Prompt injection
     injection_warning = detect_prompt_injection(query)
     if injection_warning:
         warnings.append(injection_warning)
-        return warnings  # Block immediately
+        return query, warnings  # Block immediately
 
     # Malicious intent (hacking, etc.)
     malicious_warning = detect_malicious_intent(query)
     if malicious_warning:
         warnings.append(malicious_warning)
-        return warnings  # Block immediately
+        return query, warnings  # Block immediately
 
-    # PII
-    pii_warning = detect_pii(query)
+    # PII (Masks and allows to continue)
+    query, pii_warning = detect_pii(query)
     if pii_warning:
         warnings.append(pii_warning)
-        return warnings  # Block immediately
+        # Note: We do NOT return immediately here. We let it continue with the masked query.
 
     # Off-topic
     offtopic_warning = detect_off_topic(query)
     if offtopic_warning:
         warnings.append(offtopic_warning)
-        return warnings  # Block immediately
+        return query, warnings  # Block immediately
 
-    return warnings
+    return query, warnings

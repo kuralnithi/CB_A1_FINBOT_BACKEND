@@ -1,5 +1,9 @@
 import sys
 import asyncio
+import warnings
+
+# Suppress annoying FutureWarning from langchain-google-genai
+warnings.filterwarnings("ignore", category=FutureWarning, module="langchain_google_genai")
 
 # CRITICAL: For Windows compatibility with psycopg3 async mode, 
 # this MUST be set before ANY other imports or loop starts.

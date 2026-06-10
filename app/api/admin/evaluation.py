@@ -57,7 +57,7 @@ class RecommendRequest(BaseModel):
 # ─── Dataset Promotion ────────────────────────────────────────────────────────
 
 
-@router.post("/eval/add-to-dataset")
+@router.post("/add-to-dataset")
 async def add_query_to_dataset(
     payload: AddDatasetRequest,
     user: User = Depends(require_admin),
@@ -87,7 +87,7 @@ async def add_query_to_dataset(
     return {"status": "success", "message": "Added to LangSmith golden dataset."}
 
 
-@router.post("/eval/bulk-add")
+@router.post("/bulk-add")
 async def bulk_add_to_dataset(
     payload: BulkAddRequest,
     user: User = Depends(require_admin),
@@ -151,7 +151,7 @@ async def _bg_run_evaluation(username: str):
         update_eval_status(status="error", message=str(e))
 
 
-@router.post("/eval/run")
+@router.post("/run")
 async def trigger_eval_run(
     background_tasks: BackgroundTasks,
     user: User = Depends(require_admin),
@@ -163,7 +163,7 @@ async def trigger_eval_run(
     return {"status": "success", "message": "Evaluation started in background."}
 
 
-@router.get("/eval/status")
+@router.get("/status")
 async def get_eval_run_status(user: User = Depends(require_admin)):
     """Get the current progress of the background evaluation."""
     return get_eval_status()
@@ -172,7 +172,7 @@ async def get_eval_run_status(user: User = Depends(require_admin)):
 # ─── Evaluation History ───────────────────────────────────────────────────────
 
 
-@router.get("/eval/runs")
+@router.get("/runs")
 async def list_eval_runs(
     user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
@@ -196,7 +196,7 @@ async def list_eval_runs(
     ]
 
 
-@router.delete("/eval/runs/{run_id}")
+@router.delete("/runs/{run_id}")
 async def delete_eval_run(
     run_id: int,
     user: User = Depends(require_admin),
@@ -216,7 +216,7 @@ async def delete_eval_run(
 # ─── Ground Truth Recommendation ──────────────────────────────────────────────
 
 
-@router.post("/eval/recommend-ground-truth")
+@router.post("/recommend-ground-truth")
 async def recommend_ground_truth(
     payload: RecommendRequest,
     user: User = Depends(require_admin),

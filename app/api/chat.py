@@ -21,9 +21,10 @@ async def chat(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Legacy non-streaming endpoint. Uses the experimental agent pipeline.
-    """
+    """Legacy non-streaming endpoint."""
+    # Caller: c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\frontend\\src\\lib\\api\\chat.ts  sendMessage()
+    # UI:     c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\frontend\\src\\app\\chat\\page.tsx  handleSend()
+    # Next:   c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\backend\\app\\services\\rag_service.py  process_query()
     try:
         response = await process_query(
             query=request.query,
@@ -58,9 +59,11 @@ async def chat_stream(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Streaming compatibility endpoint using the main rag_service.
-    """
+    """Streaming SSE endpoint — primary chat handler used by the frontend."""
+    # Caller: c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\frontend\\src\\lib\\api\\chat.ts  streamMessage()
+    # UI:     c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\frontend\\src\\app\\chat\\page.tsx  handleSend()
+    # Next:   c:\\kural\\codebasics\\ASSIGNMENTS\\A-1 FINBOT\\backend\\app\\services\\rag_service.py  pipeline_node()ss_query()
+    # Pipeline: input_guards → query_router → RBAC → retriever → context_builder → llm_chain → output_guards
     logger.info(f"Streaming request: user={user.username}, query='{request.query[:50]}...'")
     
     async def stream_generator():
