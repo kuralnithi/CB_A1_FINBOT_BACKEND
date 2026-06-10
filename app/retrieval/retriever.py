@@ -41,7 +41,7 @@ async def retrieve_chunks(
         )
     except Exception as e:
         logger.error(f"Embedding generation failed: {e}", exc_info=True)
-        return [], []
+        raise RuntimeError(f"Embedding generation failed: {e}")
 
     # Build RBAC-aware filter
     extra_roles = extra_roles or []
@@ -79,7 +79,7 @@ async def retrieve_chunks(
             logger.info(f"[RETRIEVER] Best score: {results[0].score}")
     except Exception as e:
         logger.error(f"Qdrant search failed: {e}", exc_info=True)
-        return [], []
+        raise RuntimeError(f"Vector Database search failed: {e}")
     finally:
         # Note: In a real production app, you might want to reuse the client 
         # but here we close it to be safe if it's created per request
