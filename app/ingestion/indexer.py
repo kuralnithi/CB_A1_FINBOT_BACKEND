@@ -36,17 +36,19 @@ def get_embedding_model():
 def get_qdrant_client() -> QdrantClient:
     """Create a Qdrant client (works for both local and cloud)."""
     settings = get_settings()
+    host = settings.QDRANT_HOST or settings.QDRANT_URL
     if settings.qdrant_is_cloud:
-        return QdrantClient(url=settings.QDRANT_HOST, port=443, api_key=settings.QDRANT_API_KEY or None)
-    return QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
+        return QdrantClient(url=host, port=443, api_key=settings.QDRANT_API_KEY or None)
+    return QdrantClient(host=host, port=settings.QDRANT_PORT)
 
 
 def get_async_qdrant_client() -> AsyncQdrantClient:
     """Create an asynchronous Qdrant client (works for both local and cloud)."""
     settings = get_settings()
+    host = settings.QDRANT_HOST or settings.QDRANT_URL
     if settings.qdrant_is_cloud:
-        return AsyncQdrantClient(url=settings.QDRANT_HOST, port=443, api_key=settings.QDRANT_API_KEY or None)
-    return AsyncQdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
+        return AsyncQdrantClient(url=host, port=443, api_key=settings.QDRANT_API_KEY or None)
+    return AsyncQdrantClient(host=host, port=settings.QDRANT_PORT)
 
 
 def ensure_collection_exists(client: QdrantClient, collection_name: str, vector_size: int = 384):

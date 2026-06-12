@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     # ─── Qdrant ───────────────────────────────────────────────────────────────
     QDRANT_HOST: str = ""
+    QDRANT_URL: str = "" # Alias if user accidentally uses URL
     QDRANT_PORT: int = 6333
     QDRANT_API_KEY: str = ""
     QDRANT_COLLECTION_NAME: str = "finbot_docs"
@@ -32,7 +33,8 @@ class Settings(BaseSettings):
     @property
     def qdrant_is_cloud(self) -> bool:
         """True if QDRANT_HOST looks like a cloud URL."""
-        return self.QDRANT_HOST.startswith("http://") or self.QDRANT_HOST.startswith("https://")
+        host = self.QDRANT_HOST or self.QDRANT_URL
+        return host.startswith("http://") or host.startswith("https://")
 
     # ─── JWT ──────────────────────────────────────────────────────────────────
     JWT_SECRET_KEY: str = ""

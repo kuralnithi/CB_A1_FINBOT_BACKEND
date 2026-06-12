@@ -26,16 +26,17 @@ class HybridQueryRouter:
             settings = get_settings()
             self.encoder = HuggingFaceEncoder(name=settings.EMBEDDING_MODEL_NAME)
             
+            host = settings.QDRANT_HOST or settings.QDRANT_URL
             if settings.qdrant_is_cloud:
                 self.index = QdrantIndex(
-                    url=settings.QDRANT_HOST,
+                    url=host,
                     api_key=settings.QDRANT_API_KEY or None,
                     location=None,
                     collection_name=settings.QDRANT_COLLECTION_NAME_ROUTES
                 )
             else:
                 self.index = QdrantIndex(
-                    host=settings.QDRANT_HOST,
+                    host=host,
                     port=settings.QDRANT_PORT,
                     location=None,
                     collection_name=settings.QDRANT_COLLECTION_NAME_ROUTES
