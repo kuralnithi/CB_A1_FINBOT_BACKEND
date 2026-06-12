@@ -54,6 +54,7 @@ class HybridQueryRouter:
 
         # BROAD KEYWORD MAP (Highest Priority)
         self.keyword_map = {
+            "greetings_route": [r"\bhi\b", r"\bhello\b", r"\bhey\b", r"\bgreetings\b", r"\bheelo\b"],
             "marketing_route": [r"\bmarketing\b", r"\bcampaign\b", r"\battract\b", r"\bclient\b", r"\bsell\b", r"\bteam\b"],
             "finance_route":   [r"\bfinance\b", r"\brevenue\b", r"\bbudget\b", r"\bvendor\b", r"\bpayment\b", r"\bspend\b", r"\bcost\b"],
             "engineering_route": [r"\bengineering\b", r"\barchitecture\b", r"\bdeployment\b", r"\bapi\b", r"\bcode\b", r"\bsoftware\b"],
